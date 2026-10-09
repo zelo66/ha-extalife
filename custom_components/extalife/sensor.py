@@ -9,8 +9,8 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import (
     Any,
-    Mapping,
 )
+from collections.abc import Mapping
 
 from homeassistant.components.sensor import (
     DOMAIN as DOMAIN_SENSOR,
@@ -35,6 +35,7 @@ from homeassistant.const import (
     UnitOfEnergy,
     LIGHT_LUX,
 )
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import (
@@ -42,6 +43,8 @@ from homeassistant.helpers.typing import (
 )
 
 from .helpers.const import (
+    CONTROLLER_DATA,
+    SIGNAL_CONTROLLER_STATE_UPDATED,
     DOMAIN_VIRTUAL_SENSORS,
     DOMAIN_VIRTUAL_SENSOR,
     VIRTUAL_SENSOR_CHN_FIELD,
@@ -52,7 +55,7 @@ from .helpers.const import (
     DOMAIN_VIRTUAL_CLIMATE_SENSOR,
 )
 from .helpers.core import Core
-from .helpers.entities import ExtaLifeChannelNamed
+from .helpers.entities import ExtaLifeChannelNamed, ExtaLifeDevice
 from .pyextalife import (  # pylint: disable=syntax-error
     ExtaLifeDeviceModel,
     ExtaGateChannelType,
@@ -298,16 +301,20 @@ async def async_setup_entry(
     async def async_load_entities() -> None:
 
         channels: list[dict[str, Any]] = core.get_channels(DOMAIN_SENSOR)
-        _LOGGER.debug(f"Discovery ({DOMAIN_SENSOR}): {channels}")
+        _LOGGER.debug("Discovery (%s): %s", DOMAIN_SENSOR, channels)
         if channels:
-            async_add_entities([ExtaLifeSensor(channel_data, config_entry) for channel_data in channels])
+            async_add_entities([
+                ExtaLifeControllerIpAddress(config_entry, channel_data) if channel_data.get(CONTROLLER_DATA)
+                else ExtaLifeSensor(channel_data, config_entry)
+                for channel_data in channels
+            ])
 
         core.pop_channels(DOMAIN_SENSOR)
 
         # time for virtual, entity sensors
         for virtual_domain in DOMAIN_VIRTUAL_SENSORS:
             channels = core.get_channels(virtual_domain)
-            _LOGGER.debug(f"Discovery ({virtual_domain}): {channels}")
+            _LOGGER.debug("Discovery (%s): %s", virtual_domain, channels)
             if channels:
                 async_add_entities(
                     [ExtaLifeVirtualSensor(channel, config_entry, virtual_domain) for channel in channels]
@@ -518,8 +525,12 @@ class ExtaLifeVirtualSensor(ExtaLifeSensorBaseNamed):
         """Derive name suffix for attribute (virtual) sensor entities
         Simply escape special characters with spaces"""
 
-        from re import escape, sub
+        from re import escape, fullmatch, sub
         from string import punctuation
+
+        # MEM-21 phases: 'phase[0].voltage' => 'L1 voltage'
+        if match := fullmatch(r"phase\[(\d+)\]\.(\w+)", path):
+            return f"L{int(match.group(1)) + 1} {match.group(2).replace('_', ' ')}"
 
         chars = escape(punctuation)
         escaped = sub(r"[" + chars + "]", " ", path)
@@ -585,3 +596,30 @@ class ExtaLifeVirtualSensor(ExtaLifeSensorBaseNamed):
         if self.virtual_device_class == ExtaSensorDeviceClass.GATE_STATE:
             return self.native_value != ExtaGateState.NONE
         return result
+
+
+class ExtaLifeControllerIpAddress(ExtaLifeDevice, SensorEntity):
+    """IP address of EFC-01 controller"""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, config_entry: ConfigEntry, device_data: dict[str, Any]) -> None:
+        super().__init__(config_entry, device_data)
+        self._attr_translation_key = "controller_ip"
+
+    def _get_unique_id(self) -> str:
+        return f"{super()._get_unique_id()}-ip_address"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            self.core.async_signal_register(SIGNAL_CONTROLLER_STATE_UPDATED, self.async_write_ha_state)
+        )
+
+    @property
+    def available(self) -> bool:
+        return self.controller.is_connected
+
+    @property
+    def native_value(self) -> str | None:
+        return self.controller.network.get("ip_address") or self.controller.host or None

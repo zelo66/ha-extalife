@@ -169,7 +169,7 @@ async def async_setup_entry(
 
         channels: list[dict[str, Any]] = core.get_channels(DOMAIN_LIGHT)
 
-        _LOGGER.debug(f"Discovery ({DOMAIN_LIGHT}): {channels}")
+        _LOGGER.debug("Discovery (%s): %s", DOMAIN_LIGHT, channels)
         if channels:
             async_add_entities([ExtaLifeLightNamed(channel, config_entry) for channel in channels])
 
@@ -210,7 +210,7 @@ class ExtaLifeLightNamed(ExtaLifeChannelNamed, LightEntity):
             self._supported_features |= LightEntityFeature.EFFECT
             self._effect_list = EFFECT_LIST_SLR
 
-        _LOGGER.debug(f"Light type: {self.device_model.name}")
+        _LOGGER.debug("Light type: %s", self.device_model.name)
 
         self.push_virtual_sensor_channels(DOMAIN_VIRTUAL_LIGHT_SENSOR, channel)
 
@@ -253,7 +253,7 @@ class ExtaLifeLightNamed(ExtaLifeChannelNamed, LightEntity):
 
         if self._supports_white_v and self._supports_color and effect is None:
             # Exta Life colors in SLR22 are 4 bytes: RGBW
-            _LOGGER.debug(f"RGB value: {rgb}. W value: {w}")
+            _LOGGER.debug("RGB value: %s. W value: %s", rgb, w)
             rgbw = (rgb << 8) | w  # merge RGB & W
             params.update({"mode_val": rgbw})
             params.update(

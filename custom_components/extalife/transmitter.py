@@ -28,7 +28,7 @@ async def async_setup_entry(
     async def async_loader_entities() -> None:
 
         channels = core.get_channels(DOMAIN_TRANSMITTER)
-        _LOGGER.debug(f"Discovery ({DOMAIN_TRANSMITTER}): {channels}")
+        _LOGGER.debug("Discovery (%s): %s", DOMAIN_TRANSMITTER, channels)
 
         if channels:
             manager = core.storage_get(CORE_STORAGE_ID)  # transmitter_mgr
@@ -118,6 +118,6 @@ class TransmitterManager:
 
     async def unload_transmitters(self) -> None:
         """ Unload transmitters: cleanup, unregister signals etc """
-        for tr_id, transmitter in self._transmitters.items():
+        for _tr_id, transmitter in self._transmitters.items():
             await transmitter.async_will_remove_from_hass()
         self._transmitters = {}

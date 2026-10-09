@@ -40,6 +40,16 @@ OPTIONS_COVER_INVERTED_CONTROL = "inverted_control"
 SIGNAL_DATA_UPDATED = f"{DOMAIN}_data_updated"
 SIGNAL_CHANNEL_NOTIF_STATE_UPDATED = f"{DOMAIN}_channel_notif_state_updated"
 SIGNAL_DEVICE_NOTIF_CONFIG_UPDATED = f"{DOMAIN}_device_notif_config_updated"
+SIGNAL_CONTROLLER_STATE_UPDATED = f"{DOMAIN}_controller_state_updated"
+
+# repairs issues
+ISSUE_CONTROLLER_OFFLINE = "controller_offline"
+ISSUE_UNSUPPORTED_DEVICES = "unsupported_devices"
+CONTROLLER_OFFLINE_ISSUE_DELAY = 15 * 60  # seconds without connection before the issue is raised
+URL_ISSUE_TRACKER = "https://github.com/gadulowaty/ha-extalife/issues"
+
+# key marking controller (device level) data passed to platforms instead of channel data
+CONTROLLER_DATA = "_controller"
 
 
 # transmitters

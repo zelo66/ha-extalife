@@ -35,7 +35,7 @@ async def async_setup_entry(
 
     async def async_load_entities() -> None:
         devices: list[dict[str, Any]] = core.get_channels(DOMAIN_BUTTON)
-        _LOGGER.debug(f"Discovery ({DOMAIN_BUTTON}) : {devices}")
+        _LOGGER.debug("Discovery (%s) : %s", DOMAIN_BUTTON, devices)
         if devices:
             entities: list = []
             for device_data in devices:

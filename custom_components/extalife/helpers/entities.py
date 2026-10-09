@@ -3,8 +3,8 @@ import datetime
 import logging
 from typing import (
     Any,
-    Mapping,
 )
+from collections.abc import Mapping
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
@@ -41,8 +41,6 @@ from ..pyextalife import (
     ExtaLifeDeviceModelName,
     ExtaLifeMap,
     PRODUCT_MANUFACTURER,
-    PRODUCT_SERIES_EXTA_LIFE,
-    PRODUCT_SERIES_EXTA_FREE,
     DEVICE_ARR_ALL_TRANSMITTER,
 )
 
@@ -137,7 +135,6 @@ class ExtaLifeEntity(Entity):
     def device_info(self) -> DeviceInfo | None:
         """Return device specific attributes."""
 
-        prod_series = (PRODUCT_SERIES_EXTA_FREE if self.is_exta_free else PRODUCT_SERIES_EXTA_LIFE)
         serial_no = self.data.get("serial", 0)
         if self.device_model == ExtaLifeDeviceModel.EFC01:
             identify = self.controller.mac
@@ -146,7 +143,8 @@ class ExtaLifeEntity(Entity):
 
         device_info: DeviceInfo = DeviceInfo(
             identifiers={(DOMAIN, identify)},
-            name=f"{PRODUCT_MANUFACTURER} {prod_series} {self.device_model_name}",
+            # short device name (model only) - manufacturer is shown separately and entity ids stay readable
+            name=str(self.device_model_name),
             manufacturer=PRODUCT_MANUFACTURER,
             model=self.device_model_name,
             serial_number=f"{serial_no:06X} ({serial_no})"
@@ -388,7 +386,7 @@ class ExtaLifeChannelNamed(ExtaLifeChannel):
         from ..sensor import MAP_EXTA_ATTRIBUTE_TO_DEV_CLASS
 
         attr: list[dict[str, Any]] = []
-        for k, v in self.channel_data.items():  # pylint: disable=unused-variable
+        for k, _v in self.channel_data.items():  # pylint: disable=unused-variable
             dev_class = MAP_EXTA_ATTRIBUTE_TO_DEV_CLASS.get(k)
             if dev_class:
 
@@ -412,7 +410,7 @@ class ExtaLifeChannelNamed(ExtaLifeChannel):
     async def async_action(self, action, **add_pars: Any) -> dict[str, Any] | None:
         """Run controller command/action. Actions are currently hardcoded in platforms"""
 
-        _LOGGER.debug(f"Executing action '{action}' on channel {self.channel_id}, params: {add_pars}")
+        _LOGGER.debug("Executing action '%s' on channel %s, params: %s", action, self.channel_id, add_pars)
 
         return await self.controller.async_execute_action(action, self.channel_id, **add_pars)
 
@@ -455,7 +453,7 @@ class ExtaLifeChannelNamed(ExtaLifeChannel):
 
         virtual_sensors = self._get_virtual_sensors()
         if len(virtual_sensors):
-            _LOGGER.debug(f"Virtual sensors: {virtual_sensors}")
+            _LOGGER.debug("Virtual sensors: %s", virtual_sensors)
             for virtual in virtual_sensors:
                 v_channel_data = channel_data.copy()
                 v_channel_data.update({VIRTUAL_SENSOR_CHN_FIELD: virtual})

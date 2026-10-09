@@ -23,7 +23,7 @@ def mock_logbook(hass):
 
 
 @pytest.fixture
-async def controller() -> AsyncGenerator[FakeController, None]:
+async def controller() -> AsyncGenerator[FakeController]:
     """Running fake EFC-01 controller."""
     fake = FakeController()
     await fake.start()

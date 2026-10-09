@@ -231,6 +231,9 @@
             "name": "Tamper last synchronization"
           }
         }
+      },
+      "controller_connection": {
+        "name": "Connection"
       }
     },
     "climate": {
@@ -313,6 +316,9 @@
             "name": "Last synchronization"
           }
         }
+      },
+      "controller_ip": {
+        "name": "IP address"
       }
     },
     "switch": {
@@ -339,6 +345,41 @@
           "unknown": "HA error: missing translation",
           "on": "New version available",
           "off": "Up to date"
+        },
+        "state_attributes": {
+          "installed_version": {
+            "name": "Installed version"
+          },
+          "latest_version": {
+            "name": "Latest version"
+          }
+        }
+      }
+    },
+    "event": {
+      "transmitter_button": {
+        "name": "Button {button}",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "button_down": "Pressed",
+              "button_up": "Released",
+              "button_single_click": "Single click",
+              "button_double_click": "Double click",
+              "button_triple_click": "Triple click",
+              "button_long_press": "Long press"
+            }
+          }
+        }
+      },
+      "scene": {
+        "name": "Scene",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "scene_activated": "Scene activated"
+            }
+          }
         }
       }
     }
@@ -419,14 +460,31 @@
       }
     }
   },
-  "logbook": {
-    "update_failed": "update to version {latest_version} failed",
-    "update_success": "has been updated to version {installed_version}"
-  },
-  "notifications": {
-    "update_failed": {
-      "title": "Exta Life: Firmware update",
+  "exceptions": {
+    "logbook_update_failed": {
+      "message": "update to version {latest_version} failed"
+    },
+    "logbook_update_success": {
+      "message": "has been updated to version {installed_version}"
+    },
+    "notification_update_failed_title": {
+      "message": "Exta Life: Firmware update"
+    },
+    "notification_update_failed_message": {
       "message": "Device update failed. Error code {error} - {err_str}\nFor more information click {link}"
+    },
+    "update_failed": {
+      "message": "Firmware update of {device} failed. Error code {error} - {err_str}"
+    }
+  },
+  "issues": {
+    "controller_offline": {
+      "title": "Exta Life controller \"{title}\" is offline",
+      "description": "Home Assistant has not been able to connect to the EFC-01 controller \"{title}\" ({host}) for more than {minutes} minutes. Check that the controller is powered and reachable in your network. The integration keeps trying to reconnect and this issue disappears once the connection is restored."
+    },
+    "unsupported_devices": {
+      "title": "Unsupported Exta Life devices",
+      "description": "The controller \"{title}\" reports devices which are not supported by the integration yet: {devices}. They are ignored. If you want them to be supported, please open an issue at {issue_tracker} and attach the diagnostics file of the integration (credentials are removed from it)."
     }
   }
 }

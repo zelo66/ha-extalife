@@ -1,8 +1,8 @@
 import logging
 from typing import (
     Any,
-    Mapping,
 )
+from collections.abc import Mapping
 
 from homeassistant.components.climate import (
     ClimateEntity,
@@ -81,7 +81,7 @@ async def async_setup_entry(
     async def async_load_entities() -> None:
 
         channels: list[dict[str, Any]] = core.get_channels(DOMAIN_CLIMATE)
-        _LOGGER.debug(f"Discovery ({DOMAIN_CLIMATE}): {channels}")
+        _LOGGER.debug("Discovery (%s): %s", DOMAIN_CLIMATE, channels)
         if channels:
             async_add_entities([ExtaLifeClimateNamed(channel, config_entry) for channel in channels])
 

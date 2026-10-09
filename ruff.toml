@@ -1,0 +1,18 @@
+target-version = "py313"
+line-length = 120
+
+[lint]
+select = [
+    "ASYNC",  # asyncio pitfalls
+    "B",      # bugbear
+    "E4", "E7", "E9",
+    "F",      # pyflakes
+    "G",      # logging format (lazy % formatting)
+    "PLE",
+    "RUF006", # dangling asyncio tasks
+    "UP",     # pyupgrade
+    "W6",
+]
+ignore = [
+    "ASYNC109",  # API methods take explicit timeout parameters by design
+]

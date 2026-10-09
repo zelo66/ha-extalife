@@ -36,6 +36,7 @@ from .pyextalife import (
     ExtaLifeDeviceModel,
     ExtaLifeCmdErrorCode,
 )
+from datetime import UTC
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -51,7 +52,7 @@ async def async_setup_entry(
 
     async def async_load_entities() -> None:
         devices: list[dict[str, Any]] = core.get_channels(DOMAIN_UPDATE)
-        _LOGGER.debug(f"Discovery ({DOMAIN_UPDATE}) : {devices}")
+        _LOGGER.debug("Discovery (%s) : %s", DOMAIN_UPDATE, devices)
         if devices:
             async_add_entities([ExtaLifeUpdate(config_entry, device_data) for device_data in devices])
 
@@ -95,7 +96,6 @@ class ExtaLifeUpdate(ExtaLifeDevice, UpdateEntity):
     async def _async_data_update_callback(self, data: dict[str, Any]) -> None:
         # TODO: missing one-liner
 
-        # _LOGGER.debug(f"_async_data_update_callback: {self.entity_id}: received data {data}")
 
         self.on_state_notification(data)
 
@@ -120,8 +120,8 @@ class ExtaLifeUpdate(ExtaLifeDevice, UpdateEntity):
                 try:
                     self._err_code = ExtaLifeCmdErrorCode(state)
                 except ValueError as err:
-                    _LOGGER.warning(f"Device {self.device_entry.name} {self.name} firmware update failed."
-                                    f"Error was {err}")
+                    _LOGGER.warning("Device %s %s firmware update failed.Error was %s",
+                                    self.device_entry.name, self.name, err)
                     self._err_code = ExtaLifeCmdErrorCode.UNSUPPORTED_OPERATION
 
             elif state == 0:
@@ -137,7 +137,7 @@ class ExtaLifeUpdate(ExtaLifeDevice, UpdateEntity):
 
         await super().async_added_to_hass()
 
-        _LOGGER.debug(f"async_added_to_hass: entity: {self.entity_id}")
+        _LOGGER.debug("async_added_to_hass: entity: %s", self.entity_id)
 
         # register entity in Core for receiving entity own data updated notification
         self.async_on_remove(
@@ -150,8 +150,8 @@ class ExtaLifeUpdate(ExtaLifeDevice, UpdateEntity):
     async def async_install(self, version: str | None, backup: bool, **kwargs: Any) -> None:
         """Install an update."""
 
-        _LOGGER.debug(f"[{self.device_model_name}] Install request for {version}, "
-                      f"requested backup => {"YES" if backup else "NO"})")
+        _LOGGER.debug("[%s] Install request for %s, requested backup => %s)",
+                      self.device_model_name, version, "YES" if backup else "NO")
         try:
             if backup:
                 path = self._core.hass.config.path(DOMAIN)
@@ -167,25 +167,23 @@ class ExtaLifeUpdate(ExtaLifeDevice, UpdateEntity):
 
                 if await self._core.api.async_update_controller():
                     while self._core.api.is_connected and self._err_code == ExtaLifeCmdErrorCode.SUCCESS:
-                        # _LOGGER.debug(f"async_install: EFC-01 await for disconnect {timeout} sec(s)")
                         await asyncio.sleep(1)
                         timeout += 1
                         if timeout >= 60:
                             self._err_code = ExtaLifeCmdErrorCode.DEVICE_NOT_RESPONDING
                             break
 
-                    _LOGGER.debug(f"async_install: EFC-01 disconnected after {timeout} sec(s)")
+                    _LOGGER.debug("async_install: EFC-01 disconnected after %s sec(s)", timeout)
 
                     timeout = 0
                     while not self._core.api.is_connected and self._err_code == ExtaLifeCmdErrorCode.SUCCESS:
-                        # _LOGGER.debug(f"async_install: EFC-01 await for connection {timeout} sec(s)")
                         await asyncio.sleep(1)
                         timeout += 1
                         if timeout >= 120:
                             self._err_code = ExtaLifeCmdErrorCode.DEVICE_NOT_AVAILABLE
                             break
 
-                    _LOGGER.debug(f"async_install: EFC-01 reconnected after {timeout} sec(s)")
+                    _LOGGER.debug("async_install: EFC-01 reconnected after %s sec(s)", timeout)
                 else:
                     self._err_code = ExtaLifeCmdErrorCode.ACTIVATE_INVALID_PARAMETERS
 
@@ -193,9 +191,8 @@ class ExtaLifeUpdate(ExtaLifeDevice, UpdateEntity):
 
                 last_progress: int = self._in_progress
                 if await self._core.api.async_update_receiver(self.device_id):
-                    _LOGGER.debug(f"[{self.device_model_name}] Entering await loop")
+                    _LOGGER.debug("[%s] Entering await loop", self.device_model_name)
                     while (self._in_progress <= 100) and (self._err_code == ExtaLifeCmdErrorCode.SUCCESS):
-                        # _LOGGER.debug(f"async_install: {self._in_progress}%, {self._err_code.name}, {timeout} sec(s)")
                         if last_progress != self._in_progress:
                             timeout = 0
                             last_progress = self._in_progress
@@ -207,8 +204,8 @@ class ExtaLifeUpdate(ExtaLifeDevice, UpdateEntity):
                             self._err_code = ExtaLifeCmdErrorCode.DEVICE_NOT_RESPONDING
                             break
 
-                    _LOGGER.debug(f"[{self.device_model_name}] Leaving await loop {self._in_progress}%, "
-                                  f"{self._err_code.name}, {timeout} sec(s)")
+                    _LOGGER.debug("[%s] Leaving await loop %s%%, %s, %s sec(s)",
+                                  self.device_model_name, self._in_progress, self._err_code.name, timeout)
 
             placeholder = self.get_placeholder()
             placeholder.update({"link": f"[{self.device_entry.name}](/config/devices/device/{self.device_entry.id})"})
@@ -219,7 +216,15 @@ class ExtaLifeUpdate(ExtaLifeDevice, UpdateEntity):
                 title = await self._core.async_i18n_get_notification_title("update_failed", placeholder)
                 message = await self._core.async_i18n_get_notification_message("update_failed", placeholder)
                 self._core.notification_push(message, title, DOMAIN_UPDATE)
-                raise HomeAssistantError(message)
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="update_failed",
+                    translation_placeholders={
+                        "device": str(self.device_entry.name if self.device_entry else self.device_model_name),
+                        "error": str(int(self._err_code)),
+                        "err_str": self._err_code.name.replace("_", " "),
+                    },
+                )
 
             await self._core.async_logbook_write(self, "update_success", placeholder)
             await self._core.channel_manager.async_version_polling_task_run()
@@ -231,7 +236,7 @@ class ExtaLifeUpdate(ExtaLifeDevice, UpdateEntity):
     async def async_release_notes(self) -> str | None:
         """Return full release notes."""
         import time
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         polish: bool = (self.hass.config.language or "").lower().startswith("pl")
         txt_days_ago = "dni temu" if polish else "days ago"
@@ -245,19 +250,19 @@ class ExtaLifeUpdate(ExtaLifeDevice, UpdateEntity):
                 release_notes = ""
                 for device_change in device_changes:
                     if release_notes:
-                        release_notes += f"<hr style='color: silver;'/>"
+                        release_notes += "<hr style='color: silver;'/>"
 
                     channel: str = device_change.get("channel", "release")
                     ts: int = int(device_change.get("time", "0"))
-                    date = datetime.fromtimestamp(ts, timezone.utc).strftime('%Y.%m.%d')
+                    date = datetime.fromtimestamp(ts, UTC).strftime('%Y.%m.%d')
                     release_notes += f"<h3 style=\"color: {"green" if channel == "release" else "red"};\">" \
                                      f"{device_change.get("ver_str")} {txt_from} {date}, <small>"\
                                      f"{int((time.time() - ts) / 86400)}" \
                                      f" {txt_days_ago}</small></h3>"
-                    release_notes += f"<ul>"
+                    release_notes += "<ul>"
                     for info in device_change.get("info", []):
                         release_notes += f"<li>{info.get("text", "")}</li>"
-                    release_notes += f"</ul>"
+                    release_notes += "</ul>"
                     note: str = device_change.get("note", "")
                     if note:
                         release_notes += f'<ha-alert alert-type="warning" title="{txt_info}">{note}</ha-alert>'

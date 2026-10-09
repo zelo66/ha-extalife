@@ -34,7 +34,7 @@ async def async_setup_entry(
     async def async_load_entities() -> None:
 
         channels: list[dict[str, Any]] = core.get_channels(DOMAIN_SWITCH)
-        _LOGGER.debug(f"Discovery ({DOMAIN_SWITCH}): {channels}")
+        _LOGGER.debug("Discovery (%s): %s", DOMAIN_SWITCH, channels)
         if channels:
             async_add_entities([ExtaLifeSwitchNamed(channel, config_entry) for channel in channels])
 

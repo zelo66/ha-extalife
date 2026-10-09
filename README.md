@@ -13,7 +13,9 @@ ZAMEL Exta Life integration with Home Assistant based on custom component.
 * LED controllers: SLR-21, SLR-22
 * Smart sockets: ROG-21
 * Roller blind controllers: SRP-22, SRM-22
-* Heating controller: RGT-01, GKN-01
+* Gate controller: ROB-21
+* Heating controller: RGT-01
+* Transmitters (remotes, wall switches) as event entities and device triggers: P-457/2, P-457/4, P-457/8, P-457/36, RNK-22, RNK-24, RNP-21, RNP-22, RNM-24
 * Sensors: 
   * Temperature sensors: RCT-21, RCT-22, RNK-21&RNK-22 built-in
   * Flood sensor: RCZ-21
@@ -28,6 +30,10 @@ ZAMEL Exta Life integration with Home Assistant based on custom component.
 * Dimmers: RDP-01, RDP-02, RDP-11
 * Smart sockets: RWG-01
 * Roller blind controllers: SRP-02, SRP-03, ROB-01
+
+Not supported yet: GKN-01, ROP-27, LEDIX P260, Bulik DRS-985 and other devices unknown to the integration.
+When the controller reports such devices, the integration shows an issue in **Settings → Repairs**. If you want
+a device to be supported, open an issue and attach the integration diagnostics file (credentials are removed from it).
 
 **Note:** Certain switches are mapped into Home Assistant light entities depending on icon assigned to them. This is to support voice control by Google Assistant and others and because switches are mostly used for light control.
 ### Installation
@@ -47,12 +53,30 @@ Minimum supported Home Assistant version: **2025.1** (tested with 2025.1 and 202
 The integration is set up from Home Assistant GUI (Settings → Devices & services → Add integration). Search for "Exta Life" on the list of possible integrations. If it's not visible - clear your browser cache and refresh page.
 The integration supports Integration Options (poll intervals, switches mapped as lights, inverted cover control, disabling entities of not responding devices) - use **Configure** on the Exta Life integration card.
 
+### Features
+* **Events** - every transmitter button is an `event` entity (pressed, released, single / double / triple click,
+  long press), scenes activated on the controller are reported by the `Scene` event entity of the controller.
+  The same actions are available as device triggers in automations.
+* **Controller diagnostics** - `Connection` and `IP address` entities of the EFC-01 device, firmware updates of the
+  controller and modules via `update` entities.
+* **Repairs** - an issue is raised when the controller is offline for more than 15 minutes and when the controller
+  reports unsupported devices.
+* **Services** - `extalife.refresh_state`, `extalife.restart` and `extalife.config_backup` (the last two for
+  administrators only).
+* **Diagnostics** - downloadable diagnostics with controller configuration; login and password are removed.
+
+Devices are named after their model (e.g. `ROP-21`), entities after the channel name set in the Exta Life app,
+so entity ids look like `switch.rop_21_kitchen`. Renaming the device in Home Assistant lets you rename entity ids too.
+
 ### Development
 Tests run against a fake EFC-01 controller (no hardware needed):
 ```
 pip install -r requirements_test.txt
 python -m pytest
+ruff check custom_components tests
 ```
+Releases: set `version` in `custom_components/extalife/manifest.json` and push a tag with the same version
+(e.g. `2.3b1`) - the release workflow creates the GitHub release which HACS offers as an update.
 
 Discussion, news and many more on https://www.forumextalife.pl/
 

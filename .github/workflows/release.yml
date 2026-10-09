@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "[0-9]*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that tag matches manifest version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          VERSION=$(python3 -c "import json; print(json.load(open('custom_components/extalife/manifest.json'))['version'])")
+          if [ "$TAG" != "$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match manifest version $VERSION"
+            exit 1
+          fi
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          # versions like 2.2b19 are beta releases
+          prerelease: ${{ contains(github.ref_name, 'b') || contains(github.ref_name, 'rc') }}

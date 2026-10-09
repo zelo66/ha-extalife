@@ -9,9 +9,8 @@ from datetime import (
 )
 from typing import (
     Any,
-    Awaitable,
-    Callable,
 )
+from collections.abc import Awaitable, Callable
 
 import homeassistant.const
 from homeassistant.components.logbook import async_log_entry
@@ -23,7 +22,8 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import Entity
-from homeassistant.helpers.event import async_track_time_interval
+from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.translation import async_get_translations
 from homeassistant.loader import (
     Integration,
@@ -33,6 +33,9 @@ from .const import (
     DATA_CORE,
     DOMAIN,
     CONF_EXTALIFE_EVENT_SCENE,
+    CONTROLLER_OFFLINE_ISSUE_DELAY,
+    ISSUE_CONTROLLER_OFFLINE,
+    SIGNAL_CONTROLLER_STATE_UPDATED,
     URL_CHANGELOG_JSON,
 )
 from .typing import (
@@ -126,6 +129,7 @@ class Core:
         self._storage = {}
 
         self._is_unloading = False
+        self._offline_check_cancel: Callable[[], None] | None = None
 
     # noinspection PyUnusedLocal
     async def _options_change_callback(self, hass: HomeAssistant, config_entry: ConfigEntry):
@@ -176,6 +180,9 @@ class Core:
         await self.channel_manager.async_version_polling_task_setup(False, False)
 
         await self.api.async_disconnect()
+
+        ir.async_delete_issue(self.hass, DOMAIN, self._offline_issue_id)
+        self.channel_manager.async_remove_issues()
 
         result = True
         if self._platforms:
@@ -229,6 +236,7 @@ class Core:
                 continue
             inst.unregister_signal_callbacks()
             inst.unregister_track_time_callbacks()
+            inst._offline_check_stop()
 
             if inst._options_change_remove_callback:
                 with suppress(ValueError):
@@ -248,6 +256,11 @@ class Core:
 
         # controller device must exist before devices discovered on it, which refer to it as their parent
         self._async_register_controller_device()
+
+        # connection is back - controller is not offline anymore
+        self._offline_check_stop()
+        ir.async_delete_issue(self.hass, DOMAIN, self._offline_issue_id)
+        self.async_signal_send(SIGNAL_CONTROLLER_STATE_UPDATED)
 
         await self.channel_manager.async_status_polling_task_setup()
         await self.channel_manager.async_version_polling_task_setup()
@@ -269,8 +282,46 @@ class Core:
         # Update controller software info
         if self._controller_entity is not None:
             self._controller_entity.async_schedule_update_ha_state()
+        self.async_signal_send(SIGNAL_CONTROLLER_STATE_UPDATED)
+
+        # raise repair issue if the controller won't be back in reasonable time
+        self._offline_check_stop()
+        self._offline_check_cancel = async_call_later(
+            self.hass, CONTROLLER_OFFLINE_ISSUE_DELAY, self._async_offline_check
+        )
 
         return 10
+
+    @property
+    def _offline_issue_id(self) -> str:
+        return f"{ISSUE_CONTROLLER_OFFLINE}_{self.config_entry.entry_id}"
+
+    def _offline_check_stop(self) -> None:
+        if self._offline_check_cancel is not None:
+            self._offline_check_cancel()
+            self._offline_check_cancel = None
+
+    # noinspection PyUnusedLocal
+    async def _async_offline_check(self, now: datetime | None = None) -> None:
+        """Called when controller is disconnected for a longer time"""
+        self._offline_check_cancel = None
+        if self.is_unloading or self.api.is_connected:
+            return
+
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            self._offline_issue_id,
+            is_fixable=False,
+            is_persistent=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key=ISSUE_CONTROLLER_OFFLINE,
+            translation_placeholders={
+                "title": self.config_entry.title,
+                "host": str(self.config_entry.data.get("controller_ip") or self.api.host),
+                "minutes": str(CONTROLLER_OFFLINE_ISSUE_DELAY // 60),
+            },
+        )
 
     async def _on_api_notification_callback(self, notification: ExtaLifeResponse) -> None:
         if self._is_unloading or self._is_stopping:
@@ -304,7 +355,6 @@ class Core:
         from homeassistant.helpers import device_registry as dr
         from ..pyextalife import (
             PRODUCT_MANUFACTURER,
-            PRODUCT_SERIES_EXTA_LIFE,
             ExtaLifeDeviceModelName,
         )
 
@@ -318,7 +368,7 @@ class Core:
             connections={(dr.CONNECTION_NETWORK_MAC, self.api.mac)},
             manufacturer=PRODUCT_MANUFACTURER,
             model=ExtaLifeDeviceModelName.EFC01,
-            name=f"{PRODUCT_MANUFACTURER} {PRODUCT_SERIES_EXTA_LIFE} {ExtaLifeDeviceModelName.EFC01}",
+            name=str(ExtaLifeDeviceModelName.EFC01),
             serial_number=f"{serial_no:06X} ({serial_no})",
             sw_version=self.api.version_installed or None,
         )
@@ -389,7 +439,7 @@ class Core:
         self._signal_callbacks[cb_type] = callback
 
     def unregister_signal_callbacks(self) -> None:
-        for cb_type, callback in self.signal_remove_callbacks.items():
+        for _cb_type, callback in self.signal_remove_callbacks.items():
             callback()
         self._signal_callbacks = {}
 
@@ -448,7 +498,7 @@ class Core:
     async def async_unload_custom_platforms(self) -> None:
         """Unload other, custom (pseudo)platforms"""
 
-        for platform, channels in self._platforms_cust.items():
+        for platform, _channels in self._platforms_cust.items():
 
             if platform.startswith("virtual"):
                 # virtual platforms does not have import module so cannot be unloaded
@@ -559,7 +609,7 @@ class Core:
                         changelog = await response.json(content_type=None)
                 self._changelog.update({"next": datetime.now().timestamp() + 6 * 3600, "data": changelog})
 
-        except (asyncio.TimeoutError, OSError) as conn_err:
+        except (TimeoutError, OSError) as conn_err:
             _LOGGER.warning("Failed to get changelog: %s", conn_err)
             self._changelog.update({"next": datetime.now().timestamp() + 60})
 
@@ -595,14 +645,14 @@ class Core:
 
     async def async_logbook_write(self, entity: Entity, message_key, placeholder: dict[str, str]) -> None:
         name: str = f"{entity.device_entry.name} {entity.name}"
-        message: str = await self.i18n_get("logbook", message_key, placeholder)
+        message: str = await self.i18n_get("exceptions", f"logbook_{message_key}.message", placeholder)
         async_log_entry(self.hass, name, message, DOMAIN, entity.entity_id)
 
     async def async_i18n_get_notification_title(self, key: str, placeholder: dict[str, str]) -> str:
-        return await self.i18n_get("notifications", f"{key}.title", placeholder)
+        return await self.i18n_get("exceptions", f"notification_{key}_title.message", placeholder)
 
     async def async_i18n_get_notification_message(self, key: str, placeholder: dict[str, str]) -> str:
-        return await self.i18n_get("notifications", f"{key}.message", placeholder)
+        return await self.i18n_get("exceptions", f"notification_{key}_message.message", placeholder)
 
     def notification_push(self, message, title, notification_id: str = "") -> None:
 

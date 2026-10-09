@@ -3,8 +3,8 @@ import logging
 from enum import StrEnum
 from typing import (
     Any,
-    Mapping,
 )
+from collections.abc import Mapping
 
 from homeassistant.components.cover import (
     CoverDeviceClass,
@@ -55,7 +55,7 @@ async def async_setup_entry(
     async def async_load_entities() -> None:
 
         channels: list[dict[str, Any]] = core.get_channels(DOMAIN_COVER)
-        _LOGGER.debug(f"Discovery ({DOMAIN_COVER}): {channels}")
+        _LOGGER.debug("Discovery (%s): %s", DOMAIN_COVER, channels)
         if channels:
             async_add_entities([ExtaLifeCoverNamed(channel, config_entry) for channel in channels])
 
@@ -221,10 +221,10 @@ class ExtaLifeCoverNamed(ExtaLifeChannelNamed, CoverEntity):
             if await self.async_action(action, value=pos):
                 if self.is_gate:
                     self._action = ExtaCoverAction.OPENING
-                    _LOGGER.debug( f"open_cover for gate: {self.entity_id}. action: {self._action}" )
+                    _LOGGER.debug( "open_cover for gate: %s. action: %s", self.entity_id, self._action )
                 else:
                     data["value"] = pos
-                    _LOGGER.debug(f"open_cover for cover: {self.entity_id}. pos: {pos}")
+                    _LOGGER.debug("open_cover for cover: %s. pos: %s", self.entity_id, pos)
 
                 self.async_schedule_update_ha_state()
         else:
@@ -247,10 +247,10 @@ class ExtaLifeCoverNamed(ExtaLifeChannelNamed, CoverEntity):
             if await self.async_action(action, value=pos):
                 if self.is_gate:
                     self._action = ExtaCoverAction.CLOSING
-                    _LOGGER.debug( f"close_cover for gate: {self.entity_id}. action: {self._action}" )
+                    _LOGGER.debug( "close_cover for gate: %s. action: %s", self.entity_id, self._action )
                 else:
                     data["value"] = pos
-                    _LOGGER.debug(f"close_cover for cover: {self.entity_id}. pos: {pos}")
+                    _LOGGER.debug("close_cover for cover: %s. pos: %s", self.entity_id, pos)
 
                 self.async_schedule_update_ha_state()
 

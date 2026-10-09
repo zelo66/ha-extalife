@@ -35,6 +35,30 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 
+TRANSMITTER_TRIGGER_TYPES = (
+    TRIGGER_BUTTON_DOWN,
+    TRIGGER_BUTTON_UP,
+    TRIGGER_BUTTON_SINGLE_CLICK,
+    TRIGGER_BUTTON_DOUBLE_CLICK,
+    TRIGGER_BUTTON_TRIPLE_CLICK,
+    TRIGGER_BUTTON_LONG_PRESS,
+)
+
+
+def transmitter_button_count(device_type: ExtaLifeDeviceModel) -> int:
+    """Return number of buttons of a transmitter model"""
+    if device_type in (ExtaLifeDeviceModel.RNK22, ExtaLifeDeviceModel.P4572):
+        return 2
+    if device_type in (ExtaLifeDeviceModel.RNK24, ExtaLifeDeviceModel.P4574, ExtaLifeDeviceModel.RNM24,
+                       ExtaLifeDeviceModel.RNP21, ExtaLifeDeviceModel.RNP22):
+        return 4
+    if device_type == ExtaLifeDeviceModel.P4578:
+        return 8
+    if device_type == ExtaLifeDeviceModel.P45736:
+        return 36
+    return 0
+
+
 class DeviceEvent:
     def __init__(self, event, unique_id) -> None:
         """
@@ -121,27 +145,8 @@ class TransmitterDevice(Device):
     def triggers(self) -> list:
         triggers = []
 
-        trigger_types = (
-            TRIGGER_BUTTON_UP,
-            TRIGGER_BUTTON_DOWN,
-            TRIGGER_BUTTON_SINGLE_CLICK,
-            TRIGGER_BUTTON_DOUBLE_CLICK,
-            TRIGGER_BUTTON_TRIPLE_CLICK,
-            TRIGGER_BUTTON_LONG_PRESS,
-        )
-        buttons = 0
-        if self.type in (ExtaLifeDeviceModel.RNK22, ExtaLifeDeviceModel.P4572):
-            buttons = 2
-        elif self.type in (ExtaLifeDeviceModel.RNK24, ExtaLifeDeviceModel.P4574, ExtaLifeDeviceModel.RNM24,
-                           ExtaLifeDeviceModel.RNP21, ExtaLifeDeviceModel.RNP22):
-            buttons = 4
-        elif self.type == ExtaLifeDeviceModel.P4578:
-            buttons = 8
-        elif self.type == ExtaLifeDeviceModel.P45736:
-            buttons = 36
-
-        for button in range(1, buttons + 1):
-            for trigger_type in trigger_types:
+        for button in range(1, transmitter_button_count(self.type) + 1):
+            for trigger_type in TRANSMITTER_TRIGGER_TYPES:
                 triggers.append(
                     {
                         TRIGGER_TYPE: trigger_type,

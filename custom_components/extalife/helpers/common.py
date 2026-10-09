@@ -11,7 +11,6 @@ from ..pyextalife import (
     ExtaLifeDeviceModel,
     ExtaLifeMap,
     PRODUCT_MANUFACTURER,
-    PRODUCT_SERIES_EXTA_LIFE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,7 +52,7 @@ class PseudoPlatform:
         serial_no: int = self._channel_data.get('serial')
         return {
             "identifiers": {(DOMAIN, serial_no)},
-            "name": f"{PRODUCT_MANUFACTURER} {PRODUCT_SERIES_EXTA_LIFE} {model_name}",
+            "name": str(model_name),
             "manufacturer": PRODUCT_MANUFACTURER,
             "model": model_name,
             "serial_number": f"{serial_no:06X} ({serial_no})",

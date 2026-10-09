@@ -1,9 +1,9 @@
 """Support for Exta Life binary sensor devices e.g. leakage sensor, door/window open sensor"""
 import logging
 from typing import (
-    Any,
-    Mapping
+    Any
 )
+from collections.abc import Mapping
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
@@ -11,12 +11,17 @@ from homeassistant.components.binary_sensor import (
     DOMAIN as DOMAIN_BINARY_SENSOR
 )
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .helpers.const import DOMAIN_VIRTUAL_BINARY_SENSOR_SENSOR
+from .helpers.const import (
+    CONTROLLER_DATA,
+    DOMAIN_VIRTUAL_BINARY_SENSOR_SENSOR,
+    SIGNAL_CONTROLLER_STATE_UPDATED,
+)
 from .helpers.core import Core
-from .helpers.entities import ExtaLifeChannelNamed
+from .helpers.entities import ExtaLifeChannelNamed, ExtaLifeDevice
 from .pyextalife import (  # pylint: disable=syntax-error
     DEVICE_ARR_SENS_WATER,
     DEVICE_ARR_SENS_MOTION,
@@ -38,9 +43,13 @@ async def async_setup_entry(
     async def async_load_entities() -> None:
 
         channels: list[dict[str, Any]] = core.get_channels(DOMAIN_BINARY_SENSOR)
-        _LOGGER.debug(f"Discovery: ({DOMAIN_BINARY_SENSOR}): {channels}")
+        _LOGGER.debug("Discovery: (%s): %s", DOMAIN_BINARY_SENSOR, channels)
         if channels:
-            async_add_entities([ExtaLifeBinarySensorNamed(channel, config_entry) for channel in channels])
+            async_add_entities([
+                ExtaLifeControllerConnectivity(config_entry, channel) if channel.get(CONTROLLER_DATA)
+                else ExtaLifeBinarySensorNamed(channel, config_entry)
+                for channel in channels
+            ])
 
         core.pop_channels(DOMAIN_BINARY_SENSOR)
         return None
@@ -118,7 +127,8 @@ class ExtaLifeBinarySensorNamed(ExtaLifeChannelNamed, BinarySensorEntity):
         ch_data["value_3"] = state
 
         _LOGGER.debug(
-            f"on_state_notification for entity: {self.entity_id}, id: {self.channel_id}. Status to be updated: {state}",
+            "on_state_notification for entity: %s, id: %s. Status to be updated: %s",
+            self.entity_id, self.channel_id, state,
         )
 
         # update only if notification data contains new status; prevent HS event bus overloading
@@ -127,3 +137,31 @@ class ExtaLifeBinarySensorNamed(ExtaLifeChannelNamed, BinarySensorEntity):
 
             # synchronize DataManager data with processed update & entity data
             self.sync_data_update_ha()
+
+
+class ExtaLifeControllerConnectivity(ExtaLifeDevice, BinarySensorEntity):
+    """Connection state between Home Assistant and EFC-01 controller"""
+
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, config_entry: ConfigEntry, device_data: dict[str, Any]) -> None:
+        super().__init__(config_entry, device_data)
+        self._attr_translation_key = "controller_connection"
+
+    def _get_unique_id(self) -> str:
+        return f"{super()._get_unique_id()}-connectivity"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            self.core.async_signal_register(SIGNAL_CONTROLLER_STATE_UPDATED, self.async_write_ha_state)
+        )
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def is_on(self) -> bool:
+        return self.controller.is_connected

@@ -8,7 +8,6 @@ from typing import (
 )
 
 import voluptuous as vol
-from homeassistant import config_entries
 from homeassistant.config_entries import (
     ConfigEntry,
     ConfigFlow,
@@ -206,23 +205,23 @@ class ExtaLifeFlowHandler( ConfigFlow, domain=DOMAIN ):
                 return await self.async_step_title()
 
             except AbortFlow as err:
-                _LOGGER.error( f"Unable to continue EFC-01 controller setup, {err}" )
+                _LOGGER.error( "Unable to continue EFC-01 controller setup, %s", err )
                 errors = { "base": "extalife_flow_error" }
 
             except ExtaLifeConnError as err:
-                _LOGGER.error( f"Cannot connect to your EFC-01 controller on IP {controller_addr}, {err}" )
+                _LOGGER.error( "Cannot connect to your EFC-01 controller on IP %s, %s", controller_addr, err )
                 errors = { "base": "extalife_no_connection" }
 
             except ExtaLifeCmdError as err:
                 if err.code == ExtaLifeCmdErrorCode.INVALID_LOG_PASS:
-                    _LOGGER.error( f"Cannot login into your EFC-01 controller. Invalid user or password" )
+                    _LOGGER.error( "Cannot login into your EFC-01 controller. Invalid user or password" )
                     errors = { "base": "extalife_invalid_cred" }
                 else:
-                    _LOGGER.error( f"Cannot login into your EFC-01 controller, {err}" )
+                    _LOGGER.error( "Cannot login into your EFC-01 controller, %s", err )
                     errors = { "base": "extalife_login_failed" }
 
             except Exception as err:  # pylint: disable=broad-except
-                _LOGGER.exception( f"Unexpected error during EFC-01 controller setup, {err}" )
+                _LOGGER.exception( "Unexpected error during EFC-01 controller setup, %s", err )
                 errors = { "base": "extalife_unk_error" }
 
             finally:

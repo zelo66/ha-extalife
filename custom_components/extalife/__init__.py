@@ -4,14 +4,15 @@ import logging
 from datetime import timedelta
 from typing import (
     Any,
-    Callable,
 )
+from collections.abc import Callable
 
 import voluptuous as vol
 from homeassistant.components.binary_sensor import DOMAIN as DOMAIN_BINARY_SENSOR
 from homeassistant.components.button import DOMAIN as DOMAIN_BUTTON
 from homeassistant.components.climate import DOMAIN as DOMAIN_CLIMATE
 from homeassistant.components.cover import DOMAIN as DOMAIN_COVER
+from homeassistant.components.event import DOMAIN as DOMAIN_EVENT
 from homeassistant.components.light import DOMAIN as DOMAIN_LIGHT
 from homeassistant.components.sensor import DOMAIN as DOMAIN_SENSOR
 from homeassistant.components.switch import DOMAIN as DOMAIN_SWITCH
@@ -25,6 +26,7 @@ from homeassistant.exceptions import (
 from homeassistant.helpers import (
     device_registry as dr,
     config_validation as cv,
+    issue_registry as ir,
 )
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import (
@@ -54,6 +56,9 @@ from .helpers.const import (
     OPTIONS_GENERAL,
     OPTIONS_GENERAL_POLL_INTERVAL,
     OPTIONS_GENERAL_VER_INTERVAL,
+    CONTROLLER_DATA,
+    ISSUE_UNSUPPORTED_DEVICES,
+    URL_ISSUE_TRACKER,
 )
 from .helpers.core import Core
 from .helpers.services import ExtaLifeServices
@@ -67,6 +72,7 @@ from .pyextalife import (
     ExtaLifeConnParams,
     ExtaLifeData,
     ExtaLifeDeviceModel,
+    ExtaLifeMap,
     ExtaLifeError,
     ExtaLifeCmdError,
     DEVICE_ARR_ALL_SWITCH,
@@ -190,7 +196,7 @@ async def async_setup_entry(
         config_entry: ConfigEntry) -> bool:
     """Set up Exta Life component from a Config Entry"""
 
-    _LOGGER.debug(f"async_setup_entry: starting for '{config_entry.title}' (entry_id='{config_entry.entry_id}')")
+    _LOGGER.debug("async_setup_entry: starting for '%s' (entry_id='%s')", config_entry.title, config_entry.entry_id)
 
     hass.data.setdefault(DOMAIN, {})
 
@@ -204,7 +210,7 @@ async def async_setup_entry(
         await core.async_cleanup_failed_setup()
         raise
 
-    _LOGGER.debug(f"async_setup_entry: finished for '{config_entry.title}' (entry_id='{config_entry.entry_id}')")
+    _LOGGER.debug("async_setup_entry: finished for '%s' (entry_id='%s')", config_entry.title, config_entry.entry_id)
 
     return result
 
@@ -215,14 +221,14 @@ async def async_unload_entry(
         config_entry: ConfigEntry) -> bool:
     """Unload a config entry: unload platform entities, stored data, deregister signal listeners"""
 
-    _LOGGER.debug(f"async_unload_entry: starting for '{config_entry.title}' (entry_id='{config_entry.entry_id}')")
+    _LOGGER.debug("async_unload_entry: starting for '%s' (entry_id='%s')", config_entry.title, config_entry.entry_id)
 
     core = Core.get(config_entry.entry_id)
     if core is None:
         return True
     result = await core.unload_entry_from_hass()
 
-    _LOGGER.debug(f"async_unload_entry: finished for '{config_entry.title}' (entry_id='{config_entry.entry_id}')")
+    _LOGGER.debug("async_unload_entry: finished for '%s' (entry_id='%s')", config_entry.title, config_entry.entry_id)
 
     return result
 
@@ -250,7 +256,7 @@ async def async_initialize(hass: HomeAssistant, config_entry: ConfigEntry) -> bo
             if yaml_conf is not None:
                 yaml_options = yaml_conf.get(CONF_OPTIONS)
 
-            _LOGGER.debug(f"init_options, yaml_options {yaml_options}")
+            _LOGGER.debug("init_options, yaml_options %s", yaml_options)
 
             options = default if yaml_options is None else yaml_options
 
@@ -273,15 +279,15 @@ async def async_initialize(hass: HomeAssistant, config_entry: ConfigEntry) -> bo
     controller_ip: str = config_entry.data[CONF_CONTROLLER_IP]
     recv_timeout: int = config_entry.data.get(CONF_RECV_TIMEOUT, DEFAULT_RECV_TIMEOUT)
 
-    _LOGGER.debug(f"[{config_entry.title}] exta life initializing '{config_entry.title}'... "
-                  f"[Debugger attached: {"YES" if ExtaLifeAPI.is_debugger_active() else "NO"}]")
+    _LOGGER.debug("[%s] exta life initializing '%s'... [Debugger attached: %s]",
+                  config_entry.title, config_entry.title, "YES" if ExtaLifeAPI.is_debugger_active() else "NO")
 
     if controller_ip:
-        _LOGGER.debug(f"[{config_entry.title}] trying to connect to controller using IP: {controller_ip}")
+        _LOGGER.debug("[%s] trying to connect to controller using IP: %s", config_entry.title, controller_ip)
         controller_host, controller_port = ExtaLifeConnParams.get_host_and_port(controller_ip)
         autodiscover: bool = False
     else:
-        _LOGGER.info(f"[{config_entry.title}] controller IP is not specified. Will use autodiscovery mode")
+        _LOGGER.info("[%s] controller IP is not specified. Will use autodiscovery mode", config_entry.title)
         controller_host = ""
         controller_port = 0
         autodiscover: bool = True
@@ -295,7 +301,7 @@ async def async_initialize(hass: HomeAssistant, config_entry: ConfigEntry) -> bo
         if isinstance(err, ExtaLifeCmdError):
             raise ConfigEntryAuthFailed(err.message) from err
         else:
-            _LOGGER.error(f"[{config_entry.title}] unable to connect to EFC @ {controller_ip}, {err.message}")
+            _LOGGER.error("[%s] unable to connect to EFC @ %s, %s", config_entry.title, controller_ip, err.message)
             raise ConfigEntryNotReady from err
 
     if not controller_ip or (controller.host != controller_host) or (controller.port != controller_port):
@@ -304,18 +310,18 @@ async def async_initialize(hass: HomeAssistant, config_entry: ConfigEntry) -> bo
         cur_data = {**config_entry.data}
         cur_data.update({CONF_CONTROLLER_IP: ExtaLifeConnParams.get_addr(controller.host, controller.port)})
         hass.config_entries.async_update_entry(config_entry, data=cur_data)
-        _LOGGER.info(f"[{config_entry.title}] controller IP updated to: {controller.host}")
+        _LOGGER.info("[%s] controller IP updated to: %s", config_entry.title, controller.host)
 
     if controller.version_installed is not None:
-        _LOGGER.debug(f"[{config_entry.title}] EFC software version: {controller.version_installed}")
+        _LOGGER.debug("[%s] EFC software version: %s", config_entry.title, controller.version_installed)
     else:
-        _LOGGER.error(f"[{config_entry.title}] error communicating with the EFC-01 controller.")
+        _LOGGER.error("[%s] error communicating with the EFC-01 controller.", config_entry.title)
         await controller.async_disconnect()
         raise ConfigEntryNotReady
 
     await core.register_controller()
 
-    _LOGGER.info(f"[{config_entry.title}] exta life integration setup finished successfully!")
+    _LOGGER.info("[%s] exta life integration setup finished successfully!", config_entry.title)
     return True
 
 
@@ -333,8 +339,40 @@ class ChannelDataManager:
         self._devices_data: dict[int, dict[str, Any]] = {}
 
         self._channels_known: list[str] = []
+        self._unsupported_devices: set[str] = set()
         self._status_polling_task_stop: Callable[[], None] | None = None
         self._version_polling_task_stop: Callable[[], None] | None = None
+
+    @property
+    def _unsupported_devices_issue_id(self) -> str:
+        return f"{ISSUE_UNSUPPORTED_DEVICES}_{self._config_entry.entry_id}"
+
+    def _async_update_unsupported_devices_issue(self) -> None:
+        """Inform user via Repairs about devices which are not supported by the integration (yet)"""
+
+        if not self._unsupported_devices:
+            ir.async_delete_issue(self._hass, DOMAIN, self._unsupported_devices_issue_id)
+            return
+
+        ir.async_create_issue(
+            self._hass,
+            DOMAIN,
+            self._unsupported_devices_issue_id,
+            is_fixable=False,
+            is_persistent=False,
+            learn_more_url=URL_ISSUE_TRACKER,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=ISSUE_UNSUPPORTED_DEVICES,
+            translation_placeholders={
+                "title": self._config_entry.title,
+                "devices": ", ".join(sorted(self._unsupported_devices)),
+                "issue_tracker": URL_ISSUE_TRACKER,
+            },
+        )
+
+    def async_remove_issues(self) -> None:
+        """Remove issues raised by the manager (on config entry unload)"""
+        ir.async_delete_issue(self._hass, DOMAIN, self._unsupported_devices_issue_id)
 
     def _channel_known(self, channel_id: str) -> bool:
         """append channel_id to list of known channels
@@ -360,7 +398,7 @@ class ChannelDataManager:
     def channel_on_notify(self, data: ExtaLifeData) -> None:
         # TODO: missing one-liner
 
-        _LOGGER.debug(f"[{self._core.config_entry.title}] channel_on_notify: received {data}")
+        _LOGGER.debug("[%s] channel_on_notify: received %s", self._core.config_entry.title, data)
 
         channel_id: str = ExtaLifeAPI.device_make_channel_id(data)
 
@@ -416,7 +454,7 @@ class ChannelDataManager:
     def device_on_notify(self, data: ExtaLifeData) -> None:
         # TODO: missing one-liner
 
-        _LOGGER.debug(f"[{self._core.config_entry.title}] device_on_notify: received {data}")
+        _LOGGER.debug("[%s] device_on_notify: received %s", self._core.config_entry.title, data)
 
         device_id = data.get("id", -1)
         signal: str = ExtaLifeDevice.signal_get_device_notification_id(device_id)
@@ -442,7 +480,7 @@ class ChannelDataManager:
 
         if self._status_polling_task_stop is not None:
             self._status_polling_task_stop()
-            _LOGGER.debug(f"[{self._core.config_entry.title}] status polling task has been removed")
+            _LOGGER.debug("[%s] status polling task has been removed", self._core.config_entry.title)
 
         self._status_polling_task_stop = None
 
@@ -454,8 +492,8 @@ class ChannelDataManager:
             OPTIONS_GENERAL_POLL_INTERVAL, DEFAULT_POLL_INTERVAL
         )
 
-        _LOGGER.debug(f"[{self._core.config_entry.title}] periodic status poll task interval "
-                      f"has been set to {status_poll_interval} minute(s)")
+        _LOGGER.debug("[%s] periodic status poll task interval has been set to %s minute(s)",
+                      self._core.config_entry.title, status_poll_interval)
         self._status_polling_task_stop = self._core.async_track_time_interval(
             self._async_status_polling_task, timedelta(minutes=status_poll_interval)
         )
@@ -466,13 +504,13 @@ class ChannelDataManager:
         This method is called from HA task scheduler via async_track_time_interval"""
 
         # use Exta Life TCP communication class
-        _LOGGER.debug(f"[{self._core.config_entry.title}] executing EFC-01 status polling task")
+        _LOGGER.debug("[%s] executing EFC-01 status polling task", self._core.config_entry.title)
 
         # if connection error or other - will receive None
         # otherwise it contains a list of channels
         channels: list[dict[str, Any]] = await self._core.api.async_get_channels()
         if channels is None or len(channels) == 0:
-            _LOGGER.warning(f"[{self._core.config_entry.title}] No Channels could be obtained from the controller")
+            _LOGGER.warning("[%s] No Channels could be obtained from the controller", self._core.config_entry.title)
             return
 
         # create indexed access: dict from list element
@@ -482,7 +520,7 @@ class ChannelDataManager:
 
         self._core.async_signal_send(SIGNAL_DATA_UPDATED)
 
-        _LOGGER.debug(f"[{self._core.config_entry.title}] Status for {len(self._channels_data)} channel(s) updated")
+        _LOGGER.debug("[%s] Status for %s channel(s) updated", self._core.config_entry.title, len(self._channels_data))
 
         await self._async_discover_devices()
 
@@ -497,14 +535,18 @@ class ChannelDataManager:
 
                 updatable: bool = (_device_type not in DEVICE_ARR_ALL_TRANSMITTER and
                                    _device_type < ExtaLifeDeviceModel.EXTA_FREE_FIRST)
-                _LOGGER.debug(f"[{self._core.config_entry.title}] new device: "
-                              f"serial_no={_serial_no:06x}; type={_device_type.name}, "
-                              f"update={"YES" if updatable else "NO"}")
+                _LOGGER.debug("[%s] new device: serial_no=%s; type=%s, update=%s",
+                              self._core.config_entry.title, format(_serial_no, '06x'), _device_type.name,
+                              "YES" if updatable else "NO")
 
                 if updatable:
                     std_platforms_channels.setdefault(DOMAIN_UPDATE, []).append(device_data)
                 if restartable:
                     std_platforms_channels.setdefault(DOMAIN_BUTTON, []).append(device_data)
+                    # controller level entities: connectivity, IP address and scene events
+                    controller_data = {**device_data, CONTROLLER_DATA: True}
+                    for domain in (DOMAIN_BINARY_SENSOR, DOMAIN_SENSOR, DOMAIN_EVENT):
+                        std_platforms_channels.setdefault(domain, []).append(controller_data)
                 return True
 
             return False
@@ -517,7 +559,9 @@ class ChannelDataManager:
         if device_register(EFC01_EXTA_APP_ID, ExtaLifeDeviceModel.EFC01, self._core.api.serial_no):
             devices += 1
 
-        light_icons_list: list[int] = self._config_entry.options.get(OPTIONS_LIGHT, {}).get(OPTIONS_LIGHT_ICONS_LIST, [])
+        light_icons_list: list[int] = self._config_entry.options.get(OPTIONS_LIGHT, {}).get(
+            OPTIONS_LIGHT_ICONS_LIST, []
+        )
 
         # get data from the ChannelDataManager object stored in HA object data
         for channel_id, channel_data in self._channels_data.items():  # -> dict id:data
@@ -532,6 +576,7 @@ class ChannelDataManager:
                 device_type: ExtaLifeDeviceModel = ExtaLifeDeviceModel(channel_data.get("type"))
             except ValueError:
                 _LOGGER.warning("Unsupported device type: %s, channel id: %s", channel_data.get("type"), channel_id)
+                self._unsupported_devices.add(f"type {channel_data.get('type')}")
                 continue
             serial_no: int = channel_data.get("serial")
             platform_name: str = ""
@@ -544,7 +589,7 @@ class ChannelDataManager:
                 continue
 
             if device_type in DEVICE_ARR_ALL_SWITCH:
-                platform_name = DOMAIN_LIGHT if channel["data"]["icon"] in light_icons_list else DOMAIN_SWITCH
+                platform_name = DOMAIN_LIGHT if channel["data"].get("icon") in light_icons_list else DOMAIN_SWITCH
 
             elif device_type in DEVICE_ARR_ALL_LIGHT:
                 platform_name = DOMAIN_LIGHT
@@ -566,16 +611,21 @@ class ChannelDataManager:
 
             elif device_type in DEVICE_ARR_ALL_TRANSMITTER:
                 usr_platforms_channels.setdefault(DOMAIN_TRANSMITTER, []).append(channel)
+                # buttons of the transmitter as event entities
+                std_platforms_channels.setdefault(DOMAIN_EVENT, []).append(channel)
                 continue
 
             if not platform_name:
-                _LOGGER.warning(f"Unsupported device type: {device_type}, channel id: {channel["id"]}")
+                _LOGGER.warning("Unsupported device type: %s, channel id: %s", device_type.name, channel_id)
+                self._unsupported_devices.add(str(ExtaLifeMap.type_to_model_name(device_type)))
                 continue
 
             std_platforms_channels.setdefault(platform_name, []).append(channel)
             entities += 1
 
-        _LOGGER.debug(f"Discovery found {entities} entities and {devices} device(s)")
+        _LOGGER.debug("Discovery found %s entities and %s device(s)", entities, devices)
+
+        self._async_update_unsupported_devices_issue()
 
         # can happen we don't have any sensors, so we need to put an empty list to trigger
         # creation of virtual sensors (if any) for
@@ -596,7 +646,7 @@ class ChannelDataManager:
 
         if platforms:
             # 'sync' call to synchronize channels' stack with platform setup
-            _LOGGER.debug(f"Forward setup for {platforms}")
+            _LOGGER.debug("Forward setup for %s", platforms)
             await self._hass.config_entries.async_forward_entry_setups(self._config_entry, platforms)
 
         # setup pseudo-platforms
@@ -633,8 +683,8 @@ class ChannelDataManager:
 
         version_poll_interval: int = 10
 
-        _LOGGER.debug(f"[{self._core.config_entry.title}] Periodic version poll task interval has "
-                      f"been set to {version_poll_interval} minutes(s)")
+        _LOGGER.debug("[%s] Periodic version poll task interval has been set to %s minutes(s)",
+                      self._core.config_entry.title, version_poll_interval)
         self._version_polling_task_stop = self._core.async_track_time_interval(
             self._async_version_polling_task, timedelta(minutes=version_poll_interval)
         )
@@ -646,7 +696,7 @@ class ChannelDataManager:
 
         if self._version_polling_task_stop is not None:
             self._version_polling_task_stop()
-            _LOGGER.debug(f"[{self._core.config_entry.title}] version polling task has been removed")
+            _LOGGER.debug("[%s] version polling task has been removed", self._core.config_entry.title)
         if unset_next_check:
             self._core.ver_check_set(-1)
         self._version_polling_task_stop = None
@@ -660,9 +710,9 @@ class ChannelDataManager:
             return
 
         try:
-            _LOGGER.debug(f"[{self._core.config_entry.title}] Executing EFC-01 version polling task")
+            _LOGGER.debug("[%s] Executing EFC-01 version polling task", self._core.config_entry.title)
 
-            for device_id, device_data in list(self.devices_get().items()):
+            for device_id, _device_data in list(self.devices_get().items()):
 
                 if device_id == EFC01_EXTA_APP_ID:
                     config_data = await self._core.api.async_check_version(self._core.ver_check_web)

@@ -223,6 +223,9 @@
             "name": "Synchronizacja naruszenia"
           }
         }
+      },
+      "controller_connection": {
+        "name": "Połączenie"
       }
     },
     "button": {
@@ -313,6 +316,9 @@
             "name": "Ostatnia synchronizacja"
           }
         }
+      },
+      "controller_ip": {
+        "name": "Adres IP"
       }
     },
     "switch": {
@@ -346,6 +352,33 @@
           },
           "latest_version": {
             "name": "Dostępna wersja"
+          }
+        }
+      }
+    },
+    "event": {
+      "transmitter_button": {
+        "name": "Przycisk {button}",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "button_down": "Wciśnięty",
+              "button_up": "Zwolniony",
+              "button_single_click": "Pojedyncze kliknięcie",
+              "button_double_click": "Podwójne kliknięcie",
+              "button_triple_click": "Potrójne kliknięcie",
+              "button_long_press": "Długie przytrzymanie"
+            }
+          }
+        }
+      },
+      "scene": {
+        "name": "Scena",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "scene_activated": "Scena uruchomiona"
+            }
           }
         }
       }
@@ -427,14 +460,31 @@
       }
     }
   },
-  "logbook": {
-    "update_failed": "aktualizacja do wersji {latest_version} nie powiodła się",
-    "update_success": "zostało zaktualizowane do wersji {installed_version}"
-  },
-  "notifications": {
-    "update_failed": {
-      "title": "Exta Life: Aktualizacja",
+  "exceptions": {
+    "logbook_update_failed": {
+      "message": "aktualizacja do wersji {latest_version} nie powiodła się"
+    },
+    "logbook_update_success": {
+      "message": "zostało zaktualizowane do wersji {installed_version}"
+    },
+    "notification_update_failed_title": {
+      "message": "Exta Life: Aktualizacja"
+    },
+    "notification_update_failed_message": {
       "message": "Aktualizacja urządzenia się nie powiodła.\n\nKod błędu {error}:{err_str}. Aby uzyskać więcej informacji, kliknij {link}"
+    },
+    "update_failed": {
+      "message": "Aktualizacja oprogramowania {device} nie powiodła się. Kod błędu {error} - {err_str}"
+    }
+  },
+  "issues": {
+    "controller_offline": {
+      "title": "Kontroler Exta Life \"{title}\" jest niedostępny",
+      "description": "Home Assistant od ponad {minutes} minut nie może połączyć się z kontrolerem EFC-01 \"{title}\" ({host}). Sprawdź, czy kontroler jest zasilany i dostępny w sieci. Integracja cały czas próbuje połączyć się ponownie, a to zgłoszenie zniknie po przywróceniu połączenia."
+    },
+    "unsupported_devices": {
+      "title": "Nieobsługiwane urządzenia Exta Life",
+      "description": "Kontroler \"{title}\" zgłasza urządzenia, które nie są jeszcze obsługiwane przez integrację: {devices}. Są one pomijane. Jeśli chcesz, aby zostały obsłużone, zgłoś to na {issue_tracker} i dołącz plik diagnostyki integracji (dane logowania są z niego usuwane)."
     }
   }
 }

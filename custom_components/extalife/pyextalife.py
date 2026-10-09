@@ -1,5 +1,4 @@
 """ ExtaLife JSON API wrapper library. Enables device control, discovery and status fetching from EFC-01 controller """
-from __future__ import print_function
 
 import asyncio
 import json
@@ -30,10 +29,8 @@ from enum import (
 )
 from typing import (
     Any,
-    Awaitable,
-    Callable,
-    Tuple,
 )
+from collections.abc import Awaitable, Callable
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -785,12 +782,12 @@ class ExtaLifeAPI:
 
         if response.status == ExtaLifeResponseStatus.FAILURE:
             if throw_error:
-                _LOGGER.error(f"ExtaLifeAPI cmd {response.command.name} FAILURE. "
-                              f"Code={response.error_code}, {response.error_message}")
+                _LOGGER.error("ExtaLifeAPI cmd %s FAILURE. Code=%s, %s",
+                              response.command.name, response.error_code, response.error_message)
                 raise ExtaLifeCmdError(response)
 
-            _LOGGER.warning(f"ExtaLifeAPI cmd {response.command.name} FAILURE. "
-                            f"Code={response.error_code}, {response.error_message}")
+            _LOGGER.warning("ExtaLifeAPI cmd %s FAILURE. Code=%s, %s",
+                            response.command.name, response.error_code, response.error_message)
             return None
 
         fixes = _CMD_RESP_DATA_FIXES.get(response.command)
@@ -905,9 +902,9 @@ class ExtaLifeAPI:
 
         if backup_retention and (entries_len - backup_retention > 0):
 
-            _LOGGER.debug(f"ConfigRotate: Requested rotation to {backup_retention} entries. "
-                          f"Found {entries_len} entries. Total {backup_files_count} file(s) of "
-                          f"size {backup_files_size} byte(s)")
+            _LOGGER.debug("ConfigRotate: Requested rotation to %s entries. Found %s entries. Total %s file(s) of size "
+                          "%s byte(s)",
+                          backup_retention, entries_len, backup_files_count, backup_files_size)
 
             for index in range(0, entries_len):
                 entry = entries[index]
@@ -919,15 +916,15 @@ class ExtaLifeAPI:
                             backup_deleted_size += backup_file_size
                             backup_deleted_count += 1
                         except OSError as err:
-                            _LOGGER.warning(f"ConfigRotate: Failed to remove '{backup_file.name}', {err}")
+                            _LOGGER.warning("ConfigRotate: Failed to remove '%s', %s", backup_file.name, err)
                             continue
 
-            _LOGGER.debug(f"ConfigRotate: Removed {entries_len - backup_retention} entries. Total "
-                          f"{backup_deleted_count} files of size {backup_deleted_size} byte(s) has been deleted")
+            _LOGGER.debug("ConfigRotate: Removed %s entries. Total %s files of size %s byte(s) has been deleted",
+                          entries_len - backup_retention, backup_deleted_count, backup_deleted_size)
 
-        _LOGGER.debug(f"ConfigRotate: Backup contains {min(entries_len, backup_retention)} entries. Total "
-                      f"{backup_files_count - backup_deleted_count} file(s) of size "
-                      f"{backup_files_size - backup_deleted_size} byte(s)")
+        _LOGGER.debug("ConfigRotate: Backup contains %s entries. Total %s file(s) of size %s byte(s)",
+                      min(entries_len, backup_retention), backup_files_count - backup_deleted_count,
+                      backup_files_size - backup_deleted_size)
 
     @staticmethod
     def _create_network_info(ip_address: str = "",
@@ -1166,7 +1163,7 @@ class ExtaLifeAPI:
                 if self._reconnect_task is None or self._reconnect_task.done():
                     self._reconnect_task = self._loop.create_task(self._async_reconnect_task(reconnect))
             else:
-                _LOGGER.info(f"Connection to EFC-01 controller has been closed")
+                _LOGGER.info("Connection to EFC-01 controller has been closed")
 
         self._network = self._create_network_info()
         self._version = self._create_version_info()
@@ -1191,13 +1188,13 @@ class ExtaLifeAPI:
         """Send command to the controller without waiting for response. Returns True if command was sent"""
 
         if not self.is_connected:
-            _LOGGER.warning(f"Controller {self.host} is not connected")
+            _LOGGER.warning("Controller %s is not connected", self.host)
             return False
 
         try:
             await self._connection.async_post_command(command, data)
         except ExtaLifeError as err:
-            _LOGGER.error(f"Controller {self.host} failed to execute command {command.name}, {err}")
+            _LOGGER.error("Controller %s failed to execute command %s, %s", self.host, command.name, err)
             return False
 
         return True
@@ -1208,7 +1205,7 @@ class ExtaLifeAPI:
         # TODO: Missing one-liner
 
         if not self.is_connected:
-            _LOGGER.warning(f"Controller {self.host} is not connected")
+            _LOGGER.warning("Controller %s is not connected", self.host)
             return None
 
         try:
@@ -1217,7 +1214,7 @@ class ExtaLifeAPI:
                 False
             )
         except ExtaLifeError as err:
-            _LOGGER.error(f"Controller {self.host} failed to execute command {command.name}, {err}")
+            _LOGGER.error("Controller %s failed to execute command %s, %s", self.host, command.name, err)
             return None
 
     async def async_connect(self, username: str, password: str,
@@ -1242,13 +1239,14 @@ class ExtaLifeAPI:
 
         # init TCP adapter and try to connect
         try:
-            _LOGGER.debug(f"Connecting to controller using {"address " + host if host else "auto discovery procedure"}")
+            _LOGGER.debug("Connecting to controller using %s",
+                          "address " + host if host else "auto discovery procedure")
             connection: ExtaLifeConn = await _async_connect_tcp(host, port)
         except ExtaLifeConnError as err:
             if host and autodiscover:
                 _LOGGER.debug(
-                    f"Connection to {host} failed. Probably device has changed its IP address. "
-                    f"Will try to discover controller new IP address")
+                    "Connection to %s failed. Probably device has changed its IP address. "
+                    "Will try to discover controller new IP address", host)
                 connection = await _async_connect_tcp()
             else:
                 raise err
@@ -1268,7 +1266,7 @@ class ExtaLifeAPI:
         try:
             await self.async_connect(self.username, self.password, self.host, self.port, recv_timeout=self.recv_timeout, conn_timeout=10.0)
         except ExtaLifeConnError as err:
-            _LOGGER.warning(f"reconnect to EFC-01 at address {self.host} at port {self.port} failed, {err}")
+            _LOGGER.warning("reconnect to EFC-01 at address %s at port %s failed, %s", self.host, self.port, err)
 
     async def async_disconnect(self, reconnect: bool = False) -> None:
         """ Disconnect from the controller and stop message tasks """
@@ -1455,20 +1453,20 @@ class ExtaLifeAPI:
                 size_total: int = 0
                 file_size: int = await self._loop.run_in_executor(None, write_backup)
                 size_total += file_size
-                _LOGGER.debug(f"ConfigBackup: Wrote {file_size} byte(s) into '{file_name}'")
+                _LOGGER.debug("ConfigBackup: Wrote %s byte(s) into '%s'", file_size, file_name)
 
                 file_name: str = os.path.join(path, f"{file_base}.json")
                 file_size = await self._loop.run_in_executor(None, write_json)
                 size_total += file_size
-                _LOGGER.debug(f"ConfigBackup: Wrote {file_size} byte(s) into '{file_name}'")
+                _LOGGER.debug("ConfigBackup: Wrote %s byte(s) into '%s'", file_size, file_name)
 
                 await self._loop.run_in_executor(
                     None, self._config_backup_rotate, path, schedule_name, retention
                 )
-                _LOGGER.debug(f"ConfigBackup: Created successfully, backup contains {size_total} byte(s)")
+                _LOGGER.debug("ConfigBackup: Created successfully, backup contains %s byte(s)", size_total)
 
             except OSError as err:
-                _LOGGER.error(f"ConfigBackup: config backup for '{file_base}' failed, {err}")
+                _LOGGER.error("ConfigBackup: config backup for '%s' failed, %s", file_base, err)
 
         return None
 
@@ -1656,7 +1654,7 @@ class ExtaLifeConnParams:
         return result
 
     @classmethod
-    def get_host_and_port(cls, addr: str) -> Tuple[str, int]:
+    def get_host_and_port(cls, addr: str) -> tuple[str, int]:
         """split provided addr as host and port"""
         host: str = (addr or "").strip()
         port: int = cls.EFC01_DEFAULT_PORT
@@ -1754,15 +1752,14 @@ class ExtaLifeConn:
 
         if task and task is not asyncio.current_task():
             if task_name != close_source:
-                _LOGGER.debug(f"_task_shutdown[{self.host}:{close_source.name}] "
-                              f"task '{task_name.name}' requesting cancellation")
+                _LOGGER.debug("_task_shutdown[%s:%s] task '%s' requesting cancellation",
+                              self.host, close_source.name, task_name.name)
                 task.cancel()
 
             try:
                 await task
             except AsyncCancelledError:
-                _LOGGER.debug(f"_task_shutdown[{self.host}:{close_source.name}] "
-                              f"task '{task_name.name}' canceled")
+                _LOGGER.debug("_task_shutdown[%s:%s] task '%s' canceled", self.host, close_source.name, task_name.name)
                 pass
 
         return None
@@ -1778,14 +1775,14 @@ class ExtaLifeConn:
         if self._socket is None:
             return
 
-        _LOGGER.debug(f"_async_close[{self.host}:{close_source.name}]: closing connection")
+        _LOGGER.debug("_async_close[%s:%s]: closing connection", self.host, close_source.name)
 
         self._ping_task = await self._task_shutdown(ExtaLifeConn.CloseSource.PING_TASK, self._ping_task, close_source)
         self._read_task = await self._task_shutdown(ExtaLifeConn.CloseSource.READ_TASK, self._read_task, close_source)
 
         async with self._write_lock:
             if not self._socket:
-                _LOGGER.debug(f"_async_close[{self.host}:{close_source.name}]: connection already closed")
+                _LOGGER.debug("_async_close[%s:%s]: connection already closed", self.host, close_source.name)
                 # socket could be released during awaiting on lock. if so just return
                 return
 
@@ -1809,14 +1806,14 @@ class ExtaLifeConn:
                 pending.set_exception(ExtaLifeConnError("connection to controller has been closed"))
         self._pending_requests.clear()
 
-        _LOGGER.debug(f"_async_close[{self.host}:{close_source.name}]: connection closed")
+        _LOGGER.debug("_async_close[%s:%s]: connection closed", self.host, close_source.name)
 
         should_reconnect = False if close_source == ExtaLifeConn.CloseSource.DISCONNECT else True
         await self._async_do_event(ExtaLifeEvent.DISCONNECTED, should_reconnect)
 
     async def _async_read_task(self) -> None:
 
-        _LOGGER.debug(f"_async_read_task[{self.host}]: STARTED")
+        _LOGGER.debug("_async_read_task[%s]: STARTED", self.host)
         try:
             while True:
                 response_raw: bytes = (await self._tcp_reader.readuntil(chr(3).encode()))[:-1]
@@ -1847,21 +1844,22 @@ class ExtaLifeConn:
                         _LOGGER.exception("_async_read_task[%s]: response handler failed", self.host)
 
         except AsyncCancelledError:
-            _LOGGER.debug(f"_async_read_task[{self.host}]: CANCELLED")
+            _LOGGER.debug("_async_read_task[%s]: CANCELLED", self.host)
             pass
 
         except Exception as err:
             self._read_task = None
-            _LOGGER.error(f"_async_read_task[{self.host}]: FAILURE - error while reading incoming messages, {str(err)}")
+            _LOGGER.error("_async_read_task[%s]: FAILURE - error while reading incoming messages, %s",
+                          self.host, str(err))
             await self._async_close(ExtaLifeConn.CloseSource.READ_TASK)
 
         finally:
-            _LOGGER.debug(f"_async_read_task[{self.host}]: FINISHED")
+            _LOGGER.debug("_async_read_task[%s]: FINISHED", self.host)
 
     async def _async_ping_task(self) -> None:
         """Perform dummy data posting to connected controller"""
 
-        _LOGGER.debug(f"_async_ping_task[{self.host}]: STARTED")
+        _LOGGER.debug("_async_ping_task[%s]: STARTED", self.host)
         try:
             while True:
                 last_write = time.monotonic() - self._tcp_last_write
@@ -1872,14 +1870,14 @@ class ExtaLifeConn:
                     await self.async_post_command(ExtaLifeCmd.NOOP)
 
         except AsyncCancelledError:
-            _LOGGER.debug(f"_async_ping_task[{self.host}]: CANCELLED")
+            _LOGGER.debug("_async_ping_task[%s]: CANCELLED", self.host)
 
         except Exception as err:
-            _LOGGER.error(f"_async_ping_task[{self.host}]: FAILURE - error while pinging controller, {str(err)}")
+            _LOGGER.error("_async_ping_task[%s]: FAILURE - error while pinging controller, %s", self.host, str(err))
             await self._async_close(ExtaLifeConn.CloseSource.PING_TASK)
 
         finally:
-            _LOGGER.debug(f"_async_ping_task[{self.host}]: FINISHED")
+            _LOGGER.debug("_async_ping_task[%s]: FINISHED", self.host)
 
     async def _async_post_data(self, data: bytes) -> None:
 
@@ -1901,7 +1899,7 @@ class ExtaLifeConn:
         request_str = str(request_data)
         if request.command == ExtaLifeCmd.LOGIN and not ExtaLifeAPI.is_debugger_active():
             request_str = re.sub(r'"password":\s*"[^"]*"', '"password": "********"', request_str)
-        _LOGGER.debug(f">>> [Cmd={request.command.name}] {request_str}")
+        _LOGGER.debug(">>> [Cmd=%s] %s", request.command.name, request_str)
 
         await self._async_post_data(request_data)
 
@@ -2007,7 +2005,7 @@ class ExtaLifeConn:
         self._socket.setblocking(False)
         self._socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
-        _LOGGER.debug(f"Trying to connect to {self.host} at port {self.port}")
+        _LOGGER.debug("Trying to connect to %s at port %s", self.host, self.port)
         try:
             coro = self._eventloop.sock_connect(self._socket, addr_info[0][4])
             await asyncio.wait_for(coro, timeout)
@@ -2029,8 +2027,8 @@ class ExtaLifeConn:
         self._read_task = self._eventloop.create_task(self._async_read_task())
         self._ping_task = self._eventloop.create_task(self._async_ping_task())
 
-        _LOGGER.debug(f"async_connect[{self.host}] successfully connected ({self._local_addr}:{self._local_port} <==> "
-                      f"{self._remote_addr}:{self._remote_port})")
+        _LOGGER.debug("async_connect[%s] successfully connected (%s:%s <==> %s:%s)",
+                      self.host, self._local_addr, self._local_port, self._remote_addr, self._remote_port)
 
     async def async_login(self, username: str, password: str) -> ExtaLifeResponse | None:
         """
@@ -2044,13 +2042,13 @@ class ExtaLifeConn:
             raise ExtaLifeConnError("async_login, user already logged in")
 
         pwd = password if ExtaLifeAPI.is_debugger_active() else "*" * len(password)
-        _LOGGER.debug(f"logging in... [user: '{username}', password: '{pwd}']")
+        _LOGGER.debug("logging in... [user: '%s', password: '%s']", username, pwd)
 
         cmd_data = {"password": password, "login": username}
 
         response = ExtaLifeAPI.check_success(await self.async_exec_command(ExtaLifeCmd.LOGIN, cmd_data))
 
-        _LOGGER.debug(f"user '{username}' authenticated")
+        _LOGGER.debug("user '%s' authenticated", username)
         self._username = username
         self._password = password
 
@@ -2126,7 +2124,7 @@ class ExtaLifeConn:
             try:
                 sock.bind(server_address)
             except OSError:
-                _LOGGER.error(f"Could not connect to receive UDP multicast from EFC-01 on port {multicast_port}")
+                _LOGGER.error("Could not connect to receive UDP multicast from EFC-01 on port %s", multicast_port)
                 return ""
 
             # Tell the operating system to add the socket to the multicast group

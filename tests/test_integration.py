@@ -268,6 +268,8 @@ async def test_reconnect_after_connection_loss(hass: HomeAssistant, controller: 
 
         controller.drop_connections()
         await wait_for(hass, lambda: controller.connections == 2 and core.api.is_connected, timeout=5)
+        # wait until state refresh done after reconnection is finished (periodic version poll is set up last)
+        await wait_for(hass, lambda: core.channel_manager._version_polling_task_stop is not None, timeout=5)
 
         controller.notify(20, {"id": 11, "channel": 1, "state": 1})
         await wait_for(hass, lambda: hass.states.get(socket).state == STATE_ON)

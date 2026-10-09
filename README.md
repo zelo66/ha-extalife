@@ -33,7 +33,7 @@ ZAMEL Exta Life integration with Home Assistant based on custom component.
 
 Not supported yet: GKN-01, ROP-27, LEDIX P260, Bulik DRS-985 and other devices unknown to the integration.
 When the controller reports such devices, the integration shows an issue in **Settings → Repairs**. If you want
-a device to be supported, open an issue and attach the integration diagnostics file (credentials are removed from it).
+a device to be supported, open an issue and attach a traffic recording made while using the device (see below).
 
 **Note:** Certain switches are mapped into Home Assistant light entities depending on icon assigned to them. This is to support voice control by Google Assistant and others and because switches are mostly used for light control.
 ### Installation
@@ -61,9 +61,13 @@ The integration supports Integration Options (poll intervals, switches mapped as
   controller and modules via `update` entities.
 * **Repairs** - an issue is raised when the controller is offline for more than 15 minutes and when the controller
   reports unsupported devices.
-* **Services** - `extalife.refresh_state`, `extalife.restart` and `extalife.config_backup` (the last two for
-  administrators only).
+* **Services** - `extalife.refresh_state`, `extalife.restart`, `extalife.config_backup` and
+  `extalife.record_traffic` (all but the first one for administrators only).
 * **Diagnostics** - downloadable diagnostics with controller configuration; login and password are removed.
+* **Traffic recording** - `extalife.record_traffic` records all messages exchanged with the controller for given
+  number of minutes to `config/extalife/recordings/` (login and password removed). Such recordings are replayed by
+  the tests, so attaching one to an issue is the best way to get a problem fixed or a new device supported -
+  see [tests/recordings](tests/recordings/README.md).
 
 Devices are named after their model (e.g. `ROP-21`), entities after the channel name set in the Exta Life app,
 so entity ids look like `switch.rop_21_kitchen`. Renaming the device in Home Assistant lets you rename entity ids too.

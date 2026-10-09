@@ -458,6 +458,20 @@
           "description": "Symulowane zdarzenie: single, double, triple, down, up"
         }
       }
+    },
+    "record_traffic": {
+      "name": "Nagraj komunikację ze sterownikiem",
+      "description": "Zapisuje wszystkie komunikaty wymieniane ze sterownikiem do pliku w config/extalife/recordings. Login i hasło są usuwane. Przydatne przy zgłaszaniu problemów i dodawaniu obsługi nowych urządzeń.",
+      "fields": {
+        "entity_id": {
+          "name": "Encja",
+          "description": "Encja reprezentująca kontroler"
+        },
+        "duration": {
+          "name": "Czas trwania",
+          "description": "Czas nagrywania w minutach. 0 kończy trwające nagrywanie i zapisuje je."
+        }
+      }
     }
   },
   "exceptions": {
@@ -475,6 +489,15 @@
     },
     "update_failed": {
       "message": "Aktualizacja oprogramowania {device} nie powiodła się. Kod błędu {error} - {err_str}"
+    },
+    "recording_in_progress": {
+      "message": "Nagrywanie komunikacji już trwa"
+    },
+    "notification_recording_saved_title": {
+      "message": "Exta Life: zapisano nagranie komunikacji"
+    },
+    "notification_recording_saved_message": {
+      "message": "Zapisano {messages} komunikatów ({size} bajtów) do pliku `{path}`.\n\nLogin i hasło zostały usunięte, ale plik zawiera nazwy urządzeń, numery seryjne i adresy sieciowe kontrolera. Dołączaj go do zgłoszeń tylko, jeśli Ci to nie przeszkadza."
     }
   },
   "issues": {

@@ -30,6 +30,7 @@
     "config_backup": "mdi:archive-arrow-down",
     "restart": "mdi:restart",
     "refresh_state": "mdi:sync",
-    "test_button": "mdi:button-pointer"
+    "test_button": "mdi:button-pointer",
+    "record_traffic": "mdi:record-rec"
   }
 }

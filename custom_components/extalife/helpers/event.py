@@ -50,6 +50,14 @@ class ExtaLifeTransmitterEventProcessor(ExtaLifeEventProcessor):
         self._device = device
         self._event_data = dict()
         self._event_window = dict()
+        self._window_timers: dict = {}
+
+    def shutdown(self) -> None:
+        """Cancel pending gesture detection timers (e.g. when config entry is unloaded)"""
+        for cancel in self._window_timers.values():
+            cancel()
+        self._window_timers = {}
+        self._event_window = {}
 
     def check_supported(self, event_type):
         if event_type != CONF_PROCESSOR_EVENT_STAT_NOTIFICATION:
@@ -86,6 +94,7 @@ class ExtaLifeTransmitterEventProcessor(ExtaLifeEventProcessor):
         @callback
         def _timeout_callback(now=None) -> None:
             # assumption: state = 0 or 1
+            self._window_timers.pop(button, None)
             events = self._event_window.pop(button, None) or []
             value = ''.join(str(event[EVENT_DATA].get('state')) for event in events)
 
@@ -113,7 +122,7 @@ class ExtaLifeTransmitterEventProcessor(ExtaLifeEventProcessor):
             # first event for the button opens new time window (maximum triple click)
             window = []
             self._event_window[button] = window
-            async_call_later(hass, self.CLICK_WINDOW_SECONDS, _timeout_callback)
+            self._window_timers[button] = async_call_later(hass, self.CLICK_WINDOW_SECONDS, _timeout_callback)
 
         window.append(self.encapsulate(data))
 

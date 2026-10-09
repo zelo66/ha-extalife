@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import json
+from pathlib import Path
 from typing import Any
 
 ETX = b"\x03"
@@ -70,6 +71,57 @@ class FakeController:
         self.sensors = copy.deepcopy(SENSORS)
         self.transmitters = copy.deepcopy(TRANSMITTERS)
         self.connections: int = 0
+        # replay of a recorded traffic (see load_recording)
+        self.replay_responses: dict[tuple[int, str], list[dict[str, Any]]] = {}
+        self.replay_responses_any: dict[int, list[dict[str, Any]]] = {}
+        self.replay_notifications: list[dict[str, Any] | str] = []
+        self.replay_header: dict[str, Any] | None = None
+
+    @staticmethod
+    def _request_key(data: Any) -> str:
+        return json.dumps(data or {}, sort_keys=True)
+
+    def load_recording(self, path: Path) -> None:
+        """Serve responses recorded from a real controller instead of built-in data.
+
+        Responses are matched by command and request data (falling back to command only),
+        unsolicited messages (notifications) can be sent with send_recorded_notifications()."""
+        from custom_components.extalife.helpers.recorder import load_recording
+
+        self.replay_header, records = load_recording(path)
+        pending: tuple[int, str] | None = None
+        sequence: list[dict[str, Any]] = []
+
+        for record in records:
+            message = record.get("msg")
+            if record["dir"] == "out":
+                if isinstance(message, dict):
+                    pending = (message.get("command"), self._request_key(message.get("data")))
+                    sequence = []
+                continue
+
+            if message is None:
+                self.replay_notifications.append(record.get("raw", ""))
+                continue
+
+            status = message.get("status")
+            if pending is not None and message.get("command") == pending[0] and status != "notification":
+                sequence.append(message)
+                if status in ("success", "failure"):
+                    self.replay_responses.setdefault(pending, sequence)
+                    self.replay_responses_any.setdefault(pending[0], sequence)
+                    pending = None
+                continue
+
+            self.replay_notifications.append(message)
+
+    def send_recorded_notifications(self) -> int:
+        for message in self.replay_notifications:
+            if isinstance(message, str):
+                self.send_raw(message.encode())
+            else:
+                self.send(message)
+        return len(self.replay_notifications)
 
     async def start(self) -> None:
         self.server = await asyncio.start_server(self._handle, "127.0.0.1", 0, limit=16 * 1024 * 1024)
@@ -98,6 +150,14 @@ class FakeController:
                 writer.write(data + ETX)
 
     def notify(self, command: int, data: dict[str, Any]) -> None:
+        if command == 20:
+            # keep device state consistent with notifications, like a real controller does
+            for device in self.receivers:
+                if device["id"] != data.get("id"):
+                    continue
+                for state in device["state"]:
+                    if state.get("channel") == data.get("channel") and "power" in state and "state" in data:
+                        state["power"] = 1 if data["state"] else 0
         self.send({"command": command, "status": "notification", "data": data})
 
     def drop_connections(self) -> None:
@@ -122,12 +182,24 @@ class FakeController:
                 command = request["command"]
                 if command in self.ignored_commands:
                     continue
-                writer.write(json.dumps(self._response(command, request.get("data") or {})).encode() + ETX)
+                for response in self._responses(command, request.get("data") or {}):
+                    writer.write(json.dumps(response).encode() + ETX)
                 await writer.drain()
         finally:
             if writer in self.writers:
                 self.writers.remove(writer)
             writer.close()
+
+    def _responses(self, command: int, data: dict[str, Any]) -> list[dict[str, Any]]:
+        if self.replay_header is not None:
+            if command == 1:  # LOGIN - credentials are not stored in recordings
+                return [{"command": 1, "status": "success", "data": {}}]
+            recorded = (self.replay_responses.get((command, self._request_key(data)))
+                        or self.replay_responses_any.get(command))
+            if recorded:
+                return copy.deepcopy(recorded)
+            return [{"command": command, "status": "success", "data": None}]
+        return [self._response(command, data)]
 
     def _response(self, command: int, data: dict[str, Any]) -> dict[str, Any]:
         def ok(payload: Any) -> dict[str, Any]:

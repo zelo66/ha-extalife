@@ -1,0 +1,34 @@
+{"format": "extalife-traffic", "version": 1, "created": "2026-10-10T00:29:19+02:00", "messages": 33, "truncated": false, "integration_version": "2.3b1", "ha_version": "2026.10.0", "controller_version": "1.6.30", "duration_minutes": 5, "note": "synthetic recording made with tests/fake_controller.py - not a real controller"}
+{"t": 0.001, "dir": "out", "msg": {"command": 154, "data": {}}}
+{"t": 0.003, "dir": "in", "msg": {"command": 154, "status": "success", "data": {"network": {"name": "EFC-01 Test", "mac": "AABBCC112233"}, "network_actual": {"ip": "127.0.0.1", "mask": "255.0.0.0", "gate": "", "dns_prime": ""}}}}
+{"t": 0.004, "dir": "out", "msg": {"command": 151, "data": {"check_web_version": false}}}
+{"t": 0.006, "dir": "in", "msg": {"command": 151, "status": "success", "data": {"installed_version": "1.6.30", "web_version": "1.6.30", "update_state": 0}}}
+{"t": 0.007, "dir": "out", "msg": {"command": 37, "data": {}}}
+{"t": 0.014, "dir": "in", "msg": {"command": 37, "status": "success", "data": {"devices": [{"id": 11, "type": 10, "serial": 720897, "is_powered": true, "state": [{"alias": "Socket", "channel": 1, "icon": 1, "power": 0, "is_timeout": false}]}, {"id": 14, "type": 10, "serial": 720900, "is_powered": true, "state": [{"alias": "Lamp", "channel": 1, "icon": 13, "power": 1, "is_timeout": false}]}, {"id": 15, "type": 10, "serial": 720901, "is_powered": true, "state": [{"alias": "Dead", "channel": 1, "icon": 1, "power": 0, "is_timeout": true}]}, {"id": 12, "type": 12, "serial": 786434, "is_powered": true, "state": [{"alias": "Blind", "channel": 1, "icon": 20, "value": 100, "is_timeout": false}]}, {"id": 13, "type": 35, "serial": 2293763, "is_powered": true, "state": [{"alias": "Meter", "channel": 1, "is_timeout": false, "total_energy": 1234500000, "phase": [{"voltage": 23000, "current": 1000, "active_power": 230}, {"voltage": 0, "current": 0, "active_power": 0}, {"voltage": 0, "current": 0, "active_power": 0}]}]}]}}}
+{"t": 0.015, "dir": "out", "msg": {"command": 38, "data": {}}}
+{"t": 0.017, "dir": "in", "msg": {"command": 38, "status": "success", "data": {"devices": [{"id": 20, "type": 20, "serial": 1310752, "state": [{"alias": "Temperature", "channel": 1, "value_1": 21.5, "is_timeout": false}]}]}}}
+{"t": 0.018, "dir": "out", "msg": {"command": 39, "data": {}}}
+{"t": 0.02, "dir": "in", "msg": {"command": 39, "status": "success", "data": {"devices": [{"id": 30, "type": 6, "serial": 393264, "state": [{"alias": "Remote"}]}]}}}
+{"t": 0.021, "dir": "out", "msg": {"command": 203, "data": {}}}
+{"t": 0.023, "dir": "in", "msg": {"command": 203, "status": "success", "data": {"devices": []}}}
+{"t": 0.034, "dir": "out", "msg": {"command": 151, "data": {"check_web_version": true}}}
+{"t": 0.037, "dir": "in", "msg": {"command": 151, "status": "success", "data": {"installed_version": "1.6.30", "web_version": "1.6.30", "update_state": 0}}}
+{"t": 0.038, "dir": "out", "msg": {"command": 27, "data": {"id": 11, "channel": 1}}}
+{"t": 0.041, "dir": "in", "msg": {"command": 27, "status": "success", "data": {"new_version": "1.0", "available_version": "1.0"}}}
+{"t": 0.042, "dir": "out", "msg": {"command": 27, "data": {"id": 14, "channel": 1}}}
+{"t": 0.044, "dir": "in", "msg": {"command": 27, "status": "success", "data": {"new_version": "1.0", "available_version": "1.0"}}}
+{"t": 0.045, "dir": "out", "msg": {"command": 27, "data": {"id": 15, "channel": 1}}}
+{"t": 0.05, "dir": "in", "msg": {"command": 27, "status": "success", "data": {"new_version": "1.0", "available_version": "1.0"}}}
+{"t": 0.051, "dir": "out", "msg": {"command": 27, "data": {"id": 12, "channel": 1}}}
+{"t": 0.054, "dir": "in", "msg": {"command": 27, "status": "success", "data": {"new_version": "1.0", "available_version": "1.0"}}}
+{"t": 0.055, "dir": "out", "msg": {"command": 27, "data": {"id": 13, "channel": 1}}}
+{"t": 0.057, "dir": "in", "msg": {"command": 27, "status": "success", "data": {"new_version": "1.0", "available_version": "1.0"}}}
+{"t": 0.058, "dir": "out", "msg": {"command": 27, "data": {"id": 20, "channel": 1}}}
+{"t": 0.062, "dir": "in", "msg": {"command": 27, "status": "success", "data": {"new_version": "1.0", "available_version": "1.0"}}}
+{"t": 0.065, "dir": "out", "msg": {"command": 27, "data": {"id": 30, "channel": 1}}}
+{"t": 0.067, "dir": "in", "msg": {"command": 27, "status": "success", "data": {"new_version": "1.0", "available_version": "1.0"}}}
+{"t": 0.07, "dir": "in", "msg": {"command": 20, "status": "notification", "data": {"id": 11, "channel": 1, "state": 1}}}
+{"t": 0.101, "dir": "in", "msg": {"command": 20, "status": "notification", "data": {"id": 30, "button": 1, "state": 1}}}
+{"t": 0.101, "dir": "in", "msg": {"command": 20, "status": "notification", "data": {"id": 30, "button": 1, "state": 0}}}
+{"t": 0.325, "dir": "in", "raw": "garbage from controller"}
+{"t": 0.325, "dir": "in", "msg": {"command": 20, "status": "notification", "data": {"id": 11, "channel": 1, "state": 0}}}

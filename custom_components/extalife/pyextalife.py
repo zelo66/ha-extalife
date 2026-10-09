@@ -873,6 +873,12 @@ class ExtaLifeAPI:
         self._network: dict[str, str] = self._create_network_info()
         self._version: dict[str, Any] = self._create_version_info()
         self._reconnect_task: Task | None = None
+        # optional observer of all messages exchanged with the controller: callback(direction, message)
+        self.traffic_callback: Callable[[str, str], None] | None = None
+
+    def _traffic_dispatch(self, direction: str, message: str) -> None:
+        if self.traffic_callback is not None:
+            self.traffic_callback(direction, message)
 
     @staticmethod
     def _config_backup_rotate(backup_path: str, backup_prefix: str, backup_retention: int) -> None:
@@ -1226,6 +1232,7 @@ class ExtaLifeAPI:
 
             conn_params: ExtaLifeConnParams = ExtaLifeConnParams(_host, _port, recv_timeout, self._loop)
             conn_params.on_event_callback = self._async_do_conn_event_callback
+            conn_params.traffic_callback = self._traffic_dispatch
 
             tcp_conn = ExtaLifeConn(conn_params)
             try:
@@ -1679,6 +1686,8 @@ class ExtaLifeConnParams:
         self._keepalive: float = keepalive
 
         self.on_event_callback: Callable[[ExtaLifeConnType, ExtaLifeEvent, Any], Awaitable] | None = None
+        # called with direction ("in" / "out") and raw message for every message exchanged with controller
+        self.traffic_callback: Callable[[str, str], None] | None = None
 
     @property
     def host(self) -> str:
@@ -1730,6 +1739,7 @@ class ExtaLifeConn:
         self._on_event_callback: Callable[
                                      [ExtaLifeConnType, ExtaLifeEvent, Any], Awaitable
                                  ] | None = params.on_event_callback
+        self._traffic_callback: Callable[[str, str], None] | None = params.traffic_callback
 
         self._username: str = ""
         self._password: str = ""
@@ -1817,6 +1827,7 @@ class ExtaLifeConn:
         try:
             while True:
                 response_raw: bytes = (await self._tcp_reader.readuntil(chr(3).encode()))[:-1]
+                self._traffic("in", response_raw.decode(errors="replace"))
 
                 try:
                     response_str: str = response_raw.decode()
@@ -1900,8 +1911,19 @@ class ExtaLifeConn:
         if request.command == ExtaLifeCmd.LOGIN and not ExtaLifeAPI.is_debugger_active():
             request_str = re.sub(r'"password":\s*"[^"]*"', '"password": "********"', request_str)
         _LOGGER.debug(">>> [Cmd=%s] %s", request.command.name, request_str)
+        if request.command != ExtaLifeCmd.NOOP:
+            self._traffic("out", request.to_json())
 
         await self._async_post_data(request_data)
+
+    def _traffic(self, direction: str, message: str) -> None:
+        """Pass exchanged message to traffic callback (e.g. traffic recorder)"""
+        if self._traffic_callback is None:
+            return
+        try:
+            self._traffic_callback(direction, message)
+        except Exception:  # pylint: disable=broad-except
+            _LOGGER.exception("Traffic callback failed")
 
     async def _async_send_request(
             self, request: ExtaLifeRequest, resp_timeout: float

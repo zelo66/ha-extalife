@@ -111,6 +111,9 @@ class Device:
     def triggers(self) -> list:
         return []
 
+    def shutdown(self) -> None:
+        """Release resources (timers etc.) of the device"""
+
     def controller_event(self, data):
         _LOGGER.debug("Device.controller_event")
         pass
@@ -155,6 +158,9 @@ class TransmitterDevice(Device):
                 )
 
         return triggers
+
+    def shutdown(self) -> None:
+        self._event_processor.shutdown()
 
     def controller_event(self, data):
         _LOGGER.debug("TransmitterDevice.controller_event")

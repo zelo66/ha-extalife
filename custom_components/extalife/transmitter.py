@@ -77,6 +77,8 @@ class ExtaLifeTransmitter(PseudoPlatform):
         if self._signal_data_notif_remove_callback:
             self._signal_data_notif_remove_callback()
             self._signal_data_notif_remove_callback = None
+        if self.device:
+            self.device.shutdown()
 
     def _sync_state_notif_update_callback(self, data) -> None:
         # pass notification to device for processing

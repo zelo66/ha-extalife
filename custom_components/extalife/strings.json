@@ -458,6 +458,20 @@
           "description": "Event to simulate: single, double, triple, down, up"
         }
       }
+    },
+    "record_traffic": {
+      "name": "Record controller traffic",
+      "description": "Record all messages exchanged with the controller to a file in config/extalife/recordings. Login and password are removed. Useful for reporting problems and adding support for new devices.",
+      "fields": {
+        "entity_id": {
+          "name": "Entity",
+          "description": "Entity ID representing controller"
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Recording time in minutes. 0 stops the recording in progress and saves it."
+        }
+      }
     }
   },
   "exceptions": {
@@ -475,6 +489,15 @@
     },
     "update_failed": {
       "message": "Firmware update of {device} failed. Error code {error} - {err_str}"
+    },
+    "recording_in_progress": {
+      "message": "Traffic recording is already in progress"
+    },
+    "notification_recording_saved_title": {
+      "message": "Exta Life: traffic recording saved"
+    },
+    "notification_recording_saved_message": {
+      "message": "{messages} messages ({size} bytes) have been saved to `{path}`.\n\nLogin and password are removed, but the file contains device names, serial numbers and network addresses of the controller. Attach it to an issue only if you are fine with that."
     }
   },
   "issues": {

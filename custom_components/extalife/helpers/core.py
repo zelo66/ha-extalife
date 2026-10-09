@@ -38,6 +38,7 @@ from .const import (
     SIGNAL_CONTROLLER_STATE_UPDATED,
     URL_CHANGELOG_JSON,
 )
+from .recorder import TrafficRecorder
 from .typing import (
     ChannelDataManagerType,
     CoreType,
@@ -131,6 +132,9 @@ class Core:
         self._is_unloading = False
         self._offline_check_cancel: Callable[[], None] | None = None
 
+        self._recorder: TrafficRecorder | None = None
+        self._recording_stop_cancel: Callable[[], None] | None = None
+
     # noinspection PyUnusedLocal
     async def _options_change_callback(self, hass: HomeAssistant, config_entry: ConfigEntry):
         """Options update listener"""
@@ -175,6 +179,9 @@ class Core:
         """Called when ConfigEntry is unloaded from Home Assistant"""
         self._is_unloading = True
 
+        # save traffic recorded so far
+        await self.async_stop_recording()
+
         await Core._callbacks_cleanup(self.config_entry.entry_id)
         await self.channel_manager.async_status_polling_task_setup(False, False)
         await self.channel_manager.async_version_polling_task_setup(False, False)
@@ -217,6 +224,7 @@ class Core:
         cls._is_stopping = True
 
         for inst in list(cls._inst.values()):
+            await inst.async_stop_recording()
             await Core._callbacks_cleanup(inst.config_entry.entry_id)
             await inst.channel_manager.async_status_polling_task_setup(False, False)
             await inst.channel_manager.async_version_polling_task_setup(False, False)
@@ -291,6 +299,74 @@ class Core:
         )
 
         return 10
+
+    @property
+    def is_recording(self) -> bool:
+        """Traffic recording is in progress"""
+        return self._recorder is not None
+
+    async def async_start_recording(self, duration: timedelta) -> None:
+        """Start recording of the traffic exchanged with the controller"""
+        from homeassistant.exceptions import HomeAssistantError
+
+        if self._recorder is not None:
+            raise HomeAssistantError(translation_domain=DOMAIN, translation_key="recording_in_progress")
+
+        self._recorder = TrafficRecorder(header={
+            "integration_version": str(self._integration.version),
+            "ha_version": homeassistant.const.__version__,
+            "controller_version": self.api.version_installed,
+            "duration_minutes": int(duration.total_seconds() // 60),
+        })
+        self.api.traffic_callback = self._recorder.record
+        self._recording_stop_cancel = async_call_later(self.hass, duration, self._async_recording_timeout)
+        _LOGGER.info("[%s] traffic recording started for %s", self.config_entry.title, duration)
+
+        # take snapshot of the controller, all devices and their configuration
+        if self.api.is_connected:
+            await self.api.async_get_efc_config_details()
+            await self.api.async_check_version(False)
+            await self.channel_manager.async_status_polling_task_setup()
+            await self.channel_manager.async_version_polling_task_run()
+
+    # noinspection PyUnusedLocal
+    async def _async_recording_timeout(self, now: datetime | None = None) -> None:
+        self._recording_stop_cancel = None
+        await self.async_stop_recording()
+
+    async def async_stop_recording(self) -> str | None:
+        """Stop recording, save it to a file and inform user. Returns path of the file"""
+        from pathlib import Path
+
+        from homeassistant.util import slugify
+
+        recorder = self._recorder
+        if recorder is None:
+            return None
+
+        self._recorder = None
+        self.api.traffic_callback = None
+        if self._recording_stop_cancel is not None:
+            self._recording_stop_cancel()
+            self._recording_stop_cancel = None
+
+        file_name = (f"traffic_{slugify(self.config_entry.title) or 'efc_01'}_"
+                     f"{recorder.started_at.strftime('%Y%m%d_%H%M%S')}.jsonl")
+        path = Path(self.hass.config.path(DOMAIN, "recordings", file_name))
+        try:
+            size = await self.hass.async_add_executor_job(recorder.save, path)
+        except OSError as err:
+            _LOGGER.error("[%s] unable to save traffic recording to %s, %s", self.config_entry.title, path, err)
+            return None
+
+        _LOGGER.info("[%s] traffic recording saved to %s (%s messages, %s bytes)",
+                     self.config_entry.title, path, recorder.message_count, size)
+
+        placeholder = {"path": str(path), "messages": str(recorder.message_count), "size": str(size)}
+        title = await self.async_i18n_get_notification_title("recording_saved", placeholder)
+        message = await self.async_i18n_get_notification_message("recording_saved", placeholder)
+        self.notification_push(message, title, f"recording_{self.config_entry.entry_id}")
+        return str(path)
 
     @property
     def _offline_issue_id(self) -> str:

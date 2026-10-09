@@ -118,3 +118,28 @@ test_button:
                         - "triple"
                         - "down"
                         - "up"
+
+record_traffic:
+    name: "Record controller traffic"
+    description: "Record all messages exchanged with the controller to a file in config/extalife/recordings. Login and password are removed. Useful for reporting problems and adding support for new devices."
+    fields:
+        entity_id:
+            name: "Entity"
+            description: "Entity ID representing controller"
+            example: extalife.efc_01
+            required: true
+            selector:
+                entity:
+                    filter:
+                        domain: extalife
+        duration:
+            name: "Duration"
+            description: "Recording time in minutes. 0 stops the recording in progress and saves it."
+            required: false
+            default: 10
+            selector:
+                number:
+                    min: 0
+                    max: 180
+                    unit_of_measurement: min
+                    mode: box

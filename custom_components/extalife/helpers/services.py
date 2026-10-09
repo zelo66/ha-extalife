@@ -1,6 +1,7 @@
 """ definition of all services for this integration """
 import logging
 import os.path
+from datetime import timedelta
 
 import voluptuous as vol
 from homeassistant.const import CONF_ENTITY_ID
@@ -31,6 +32,9 @@ SVC_RESTART = "restart"  # restart controller
 SVC_TEST_BUTTON = "test_button"
 SVC_REFRESH_STATE = "refresh_state"  # execute status refresh, fetch new status from controller
 SVC_CONFIG_BACKUP = "config_backup"  # create controller configuration backup
+SVC_RECORD_TRAFFIC = "record_traffic"  # record traffic exchanged with controller
+
+ATTR_DURATION = "duration"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -47,6 +51,14 @@ SCHEMA_CONFIG_BACKUP = vol.Schema(
         vol.Optional(CONF_BACKUP_PATH, default=""): vol.Any(None, cv.string),
         vol.Optional(CONF_BACKUP_SCHEDULE, default=""): vol.Any(None, cv.string),
         vol.Optional(CONF_BACKUP_RETENTION, default=0): vol.All(vol.Coerce(int), vol.Range(min=0)),
+    }
+)
+
+SCHEMA_RECORD_TRAFFIC = vol.Schema(
+    {
+        vol.Required(CONF_ENTITY_ID): cv.entity_id,
+        # minutes, 0 stops current recording
+        vol.Optional(ATTR_DURATION, default=10): vol.All(vol.Coerce(int), vol.Range(min=0, max=180)),
     }
 )
 
@@ -100,6 +112,7 @@ class ExtaLifeServices:
         register_service(SVC_REFRESH_STATE, self._async_handle_refresh_state, SCHEMA_REFRESH_STATE)
         register_service(SVC_TEST_BUTTON, self._async_handle_test_button, SCHEMA_TEST_BUTTON)
         register_service(SVC_CONFIG_BACKUP, self._async_handle_config_backup, SCHEMA_CONFIG_BACKUP, admin=True)
+        register_service(SVC_RECORD_TRAFFIC, self._async_handle_record_traffic, SCHEMA_RECORD_TRAFFIC, admin=True)
 
     async def async_unregister_services(self) -> None:
         """ Unregister all Exta Life integration services """
@@ -135,6 +148,17 @@ class ExtaLifeServices:
             schedule=call.data.get(CONF_BACKUP_SCHEDULE) or "",
             retention=call.data.get(CONF_BACKUP_RETENTION, 0)
         )
+
+    async def _async_handle_record_traffic(self, call: ServiceCall) -> None:
+        """ service: extalife.record_traffic - record traffic exchanged with controller to a file """
+        core = self._get_core(call.data[CONF_ENTITY_ID])
+        duration: int = call.data[ATTR_DURATION]
+
+        if duration == 0:
+            await core.async_stop_recording()
+            return
+
+        await core.async_start_recording(timedelta(minutes=duration))
 
     async def _async_handle_test_button(self, call: ServiceCall) -> None:
         """ service: extalife.test_button - simulate transmitter button events """

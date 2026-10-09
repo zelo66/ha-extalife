@@ -1,0 +1,18 @@
+{
+  "domain": "extalife",
+  "name": "Exta Life",
+  "codeowners": [
+    "@dgtal1",
+    "@gadulowaty"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "logbook"
+  ],
+  "documentation": "https://github.com/gadulowaty/ha-extalife",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/gadulowaty/ha-extalife/issues",
+  "requirements": [],
+  "version": "2.2b19"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Exta Life",
+  "homeassistant": "2025.1.0",
+  "country": ["PL"],
+  "render_readme": true
+}

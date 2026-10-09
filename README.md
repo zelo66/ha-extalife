@@ -30,10 +30,29 @@ ZAMEL Exta Life integration with Home Assistant based on custom component.
 * Roller blind controllers: SRP-02, SRP-03, ROB-01
 
 **Note:** Certain switches are mapped into Home Assistant light entities depending on icon assigned to them. This is to support voice control by Google Assistant and others and because switches are mostly used for light control.
+### Installation
+
+#### HACS (recommended)
+1. Open HACS in Home Assistant.
+2. Open the menu (three dots in the top right corner) and choose **Custom repositories**.
+3. Add `https://github.com/gadulowaty/ha-extalife` with category **Integration**.
+4. Search for **Exta Life** in HACS, download it and restart Home Assistant.
+
+#### Manual
+Copy the `custom_components/extalife` directory into the `custom_components` directory of your Home Assistant `config` directory and restart Home Assistant.
+
+Minimum supported Home Assistant version: **2025.1** (tested with 2025.1 and 2026.10).
+
 ### Setup
-Make sure you copied the integration to `custom_components` folder in your `config` directory.
-The integration is set up from Home Assistant GUI (Integrations screen). Search for "Exta Life" on the list of possible integrations. If it's not visible - clear your browser cache and refresh page.
-The integration supports Integration Options - search for it on the Exta Life integration badge in Integrations GUI.
+The integration is set up from Home Assistant GUI (Settings → Devices & services → Add integration). Search for "Exta Life" on the list of possible integrations. If it's not visible - clear your browser cache and refresh page.
+The integration supports Integration Options (poll intervals, switches mapped as lights, inverted cover control, disabling entities of not responding devices) - use **Configure** on the Exta Life integration card.
+
+### Development
+Tests run against a fake EFC-01 controller (no hardware needed):
+```
+pip install -r requirements_test.txt
+python -m pytest
+```
 
 Discussion, news and many more on https://www.forumextalife.pl/
 

@@ -56,7 +56,7 @@ SIGNAL_COMMAND_STATS_UPDATED = f"{DOMAIN}_command_stats_updated"
 ISSUE_CONTROLLER_OFFLINE = "controller_offline"
 ISSUE_UNSUPPORTED_DEVICES = "unsupported_devices"
 CONTROLLER_OFFLINE_ISSUE_DELAY = 15 * 60  # seconds without connection before the issue is raised
-URL_ISSUE_TRACKER = "https://github.com/gadulowaty/ha-extalife/issues"
+URL_ISSUE_TRACKER = "https://github.com/zelo66/ha-extalife/issues"
 
 # key marking controller (device level) data passed to platforms instead of channel data
 CONTROLLER_DATA = "_controller"

@@ -42,7 +42,7 @@ or a traffic recording made while using the device (see below).
 #### HACS (recommended)
 1. Open HACS in Home Assistant.
 2. Open the menu (three dots in the top right corner) and choose **Custom repositories**.
-3. Add `https://github.com/gadulowaty/ha-extalife` with category **Integration**.
+3. Add `https://github.com/zelo66/ha-extalife` with category **Integration**.
 4. Search for **Exta Life** in HACS, download it and restart Home Assistant.
 
 #### Manual

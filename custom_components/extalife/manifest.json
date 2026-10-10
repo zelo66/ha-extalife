@@ -9,10 +9,10 @@
   "dependencies": [
     "logbook"
   ],
-  "documentation": "https://github.com/gadulowaty/ha-extalife",
+  "documentation": "https://github.com/zelo66/ha-extalife",
   "integration_type": "hub",
   "iot_class": "local_push",
-  "issue_tracker": "https://github.com/gadulowaty/ha-extalife/issues",
+  "issue_tracker": "https://github.com/zelo66/ha-extalife/issues",
   "requirements": [],
   "version": "2.3b1"
 }

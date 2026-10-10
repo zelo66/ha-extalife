@@ -1,10 +1,11 @@
 """Support for ExtaLife devices."""
 import datetime
 import logging
+import time
 from typing import (
     Any,
 )
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
@@ -14,6 +15,7 @@ from homeassistant.helpers import (
 )
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_component import DEFAULT_SCAN_INTERVAL
 
 from .const import (
@@ -244,6 +246,8 @@ class ExtaLifeChannel(ExtaLifeEntity):
         super().__init__(config_entry, channel.get("data"))
 
         self._channel_id: str = channel.get("id")
+        # time.monotonic() of the last state change made by a command or a notification
+        self._state_changed_at: float = 0.0
 
     @staticmethod
     def _format_state_attr(attr: dict[str, Any]) -> dict[str, Any]:
@@ -286,6 +290,12 @@ class ExtaLifeChannel(ExtaLifeEntity):
         # read "data" section/dict by channel id
         data = self.channel_manager.channel_get_data(self.channel_id)
 
+        if data is not None and self._state_changed_at > self.channel_manager.status_requested_at:
+            # status snapshot was requested from the controller before the last state change (command or
+            # notification) of this entity, so it is outdated - keep current state and correct stored data
+            self.channel_manager.channel_update_data(self.channel_id, self.channel_data)
+            return
+
         self._set_data(data)
 
     async def async_will_remove_from_hass(self) -> None:
@@ -303,6 +313,7 @@ class ExtaLifeChannel(ExtaLifeEntity):
         then must update its state. For consistency reasons - Channel Data Manager is updated and then
         HA status update is scheduled"""
 
+        self._state_changed_at = time.monotonic()
         self.channel_manager.channel_update_data(self.channel_id, self.channel_data)
         self.async_schedule_update_ha_state(True)
 
@@ -413,6 +424,48 @@ class ExtaLifeChannelNamed(ExtaLifeChannel):
         _LOGGER.debug("Executing action '%s' on channel %s, params: %s", action, self.channel_id, add_pars)
 
         return await self.controller.async_execute_action(action, self.channel_id, **add_pars)
+
+    def raise_command_failed(self) -> None:
+        """Inform user that the controller did not confirm the command"""
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="command_failed",
+            translation_placeholders={"entity": self.entity_id},
+        )
+
+    async def async_actions_optimistic(
+            self,
+            actions: Sequence[Any],
+            params: dict[str, Any] | None = None,
+            data_update: dict[str, Any] | None = None,
+            assumed_on: bool | None = None,
+    ) -> None:
+        """Show the requested state immediately and send command(s) to the controller.
+
+        Radio round trip to the device can take a while - the UI should not wait for it. When the controller does
+        not confirm the command, the previous state is restored and an error is raised."""
+
+        snapshot = dict(self.channel_data)
+        previous_assumed_on = self._assumed_on
+        if data_update:
+            self.channel_data.update(data_update)
+        if assumed_on is not None:
+            self._assumed_on = assumed_on
+        self._apply_local_state()
+
+        for action in actions:
+            if not await self.async_action(action, **(params or {})):
+                self.channel_data.clear()
+                self.channel_data.update(snapshot)
+                self._assumed_on = previous_assumed_on
+                self._apply_local_state()
+                self.raise_command_failed()
+
+    def _apply_local_state(self) -> None:
+        """Publish state changed locally (not reported by the controller yet)"""
+        self._state_changed_at = time.monotonic()
+        self.channel_manager.channel_update_data(self.channel_id, self.channel_data)
+        self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added to hass."""

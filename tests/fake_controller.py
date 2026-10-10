@@ -67,6 +67,8 @@ class FakeController:
         self.writers: list[asyncio.StreamWriter] = []
         self.received: list[dict[str, Any]] = []
         self.ignored_commands: set[int] = set()
+        # simulated radio / processing time of the controller per command, in seconds
+        self.response_delay: dict[int, float] = {}
         self.receivers = copy.deepcopy(RECEIVERS)
         self.sensors = copy.deepcopy(SENSORS)
         self.transmitters = copy.deepcopy(TRANSMITTERS)
@@ -182,9 +184,14 @@ class FakeController:
                 command = request["command"]
                 if command in self.ignored_commands:
                     continue
+                if delay := self.response_delay.get(command):
+                    await asyncio.sleep(delay)
                 for response in self._responses(command, request.get("data") or {}):
                     writer.write(json.dumps(response).encode() + ETX)
-                await writer.drain()
+                try:
+                    await writer.drain()
+                except ConnectionError:
+                    break
         finally:
             if writer in self.writers:
                 self.writers.remove(writer)

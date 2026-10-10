@@ -290,6 +290,12 @@ async def test_command_timeout(hass: HomeAssistant, controller: FakeController) 
 
     # timeout is the configured one, not doubled
     assert 0.9 < elapsed < 1.6
+    # a single unanswered command (e.g. device out of radio range) keeps the connection
+    assert api.is_connected
+
+    # several commands in a row without response - connection is considered broken
+    assert await api.async_get_dev_config_details(12) is None
+    assert await api.async_get_dev_config_details(13) is None
     assert not api.is_connected
 
     await api.async_disconnect()

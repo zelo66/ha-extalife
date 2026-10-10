@@ -72,6 +72,23 @@ The integration supports Integration Options (poll intervals, switches mapped as
 Devices are named after their model (e.g. `ROP-21`), entities after the channel name set in the Exta Life app,
 so entity ids look like `switch.rop_21_kitchen`. Renaming the device in Home Assistant lets you rename entity ids too.
 
+### Slow or delayed response
+Commands go over radio from the EFC-01 controller to the device, so some delay is normal. The integration:
+* shows the requested state of lights, switches and thermostats immediately and restores the previous one
+  (with an error message) only when the controller does not confirm the command,
+* sends commands in the order they were issued and does not let background status polling overwrite
+  a newer state,
+* keeps the connection when a single command is not answered (e.g. a device out of range or a sleeping battery
+  device) and reconnects only after 3 unanswered commands in a row.
+
+If commands are still slow:
+1. Check **Max waiting time for a response** in the integration settings (Reconfigure). With a REP-21 repeater
+   in the installation it should be 10-15 seconds.
+2. Enable debug logging for `custom_components.extalife` - every command is logged as
+   `Cmd=CONTROL_DEVICE: waited X s in queue, executed in Y s`. A long *executed* time means slow radio
+   communication with the device, a long *waited* time means the controller was busy with other commands.
+3. Make a traffic recording (`extalife.record_traffic`) while reproducing the problem and attach it to an issue.
+
 ### Development
 Tests run against a fake EFC-01 controller (no hardware needed):
 ```

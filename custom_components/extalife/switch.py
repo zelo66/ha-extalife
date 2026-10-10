@@ -53,31 +53,31 @@ class ExtaLifeSwitchNamed(ExtaLifeChannelNamed, SwitchEntity):
 
         self.push_virtual_sensor_channels(DOMAIN_VIRTUAL_SWITCH_SENSOR, channel)
 
+    @property
+    def _state_field(self) -> str:
+        return "power" if self.channel_data.get("output_state") is None else "output_state"
+
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on the switch."""
         if not self.is_exta_free:
-            if await self.async_action(ExtaLifeAction.EXTA_LIFE_TURN_ON):
-                field = "power" if self.channel_data.get("output_state") is None else "output_state"
-                self.channel_data[field] = 1
-                self.async_schedule_update_ha_state()
+            await self.async_actions_optimistic(
+                [ExtaLifeAction.EXTA_LIFE_TURN_ON], data_update={self._state_field: 1}
+            )
         else:
-            if (await self.async_action(ExtaLifeAction.EXTA_FREE_TURN_ON_PRESS) and
-                    await self.async_action(ExtaLifeAction.EXTA_FREE_TURN_ON_RELEASE)):
-                self._assumed_on = True
-                self.async_schedule_update_ha_state()
+            await self.async_actions_optimistic(
+                [ExtaLifeAction.EXTA_FREE_TURN_ON_PRESS, ExtaLifeAction.EXTA_FREE_TURN_ON_RELEASE], assumed_on=True
+            )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the switch."""
         if not self.is_exta_free:
-            if await self.async_action(ExtaLifeAction.EXTA_LIFE_TURN_OFF):
-                field = "power" if self.channel_data.get("output_state") is None else "output_state"
-                self.channel_data[field] = 0
-                self.async_schedule_update_ha_state()
+            await self.async_actions_optimistic(
+                [ExtaLifeAction.EXTA_LIFE_TURN_OFF], data_update={self._state_field: 0}
+            )
         else:
-            if (await self.async_action(ExtaLifeAction.EXTA_FREE_TURN_OFF_PRESS) and
-                    await self.async_action(ExtaLifeAction.EXTA_FREE_TURN_OFF_RELEASE)):
-                self._assumed_on = False
-                self.async_schedule_update_ha_state()
+            await self.async_actions_optimistic(
+                [ExtaLifeAction.EXTA_FREE_TURN_OFF_PRESS, ExtaLifeAction.EXTA_FREE_TURN_OFF_RELEASE], assumed_on=False
+            )
 
     @property
     def is_on(self) -> bool:

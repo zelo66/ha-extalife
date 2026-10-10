@@ -267,21 +267,19 @@ class ExtaLifeLightNamed(ExtaLifeChannelNamed, LightEntity):
             )  # mode - one of effects
 
         if not self.is_exta_free:
-            if await self.async_action(ExtaLifeAction.EXTA_LIFE_TURN_ON, **params):
-                # update channel data with new values
-                data["power"] = 1
-                mode_val_new = params.get("mode_val")
-                if mode_val_new is not None:
-                    # convert new value to the format of the old value from channel
-                    params["mode_val"] = modeval_upd(mode_val, mode_val_new)
+            # new channel data; mode_val is converted to the format of the old value from channel
+            data_update = {**params, "power": 1}
+            if params.get("mode_val") is not None:
+                data_update["mode_val"] = modeval_upd(mode_val, params["mode_val"])
 
-                data.update(params)
-                self.async_schedule_update_ha_state()
+            await self.async_actions_optimistic(
+                [ExtaLifeAction.EXTA_LIFE_TURN_ON], params=params, data_update=data_update
+            )
         else:
-            if (await self.async_action(ExtaLifeAction.EXTA_FREE_TURN_ON_PRESS, **params) and
-                    await self.async_action(ExtaLifeAction.EXTA_FREE_TURN_ON_RELEASE, **params)):
-                self._assumed_on = True
-                self.async_schedule_update_ha_state()
+            await self.async_actions_optimistic(
+                [ExtaLifeAction.EXTA_FREE_TURN_ON_PRESS, ExtaLifeAction.EXTA_FREE_TURN_ON_RELEASE],
+                params=params, assumed_on=True
+            )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn off the switch."""
@@ -298,15 +296,14 @@ class ExtaLifeLightNamed(ExtaLifeChannelNamed, LightEntity):
             params.update({"value": value})
 
         if not self.is_exta_free:
-            if await self.async_action(ExtaLifeAction.EXTA_LIFE_TURN_OFF, **params):
-                data["power"] = 0
-                data["mode"] = mode
-                self.async_schedule_update_ha_state()
+            await self.async_actions_optimistic(
+                [ExtaLifeAction.EXTA_LIFE_TURN_OFF], params=params, data_update={"power": 0}
+            )
         else:
-            if (await self.async_action(ExtaLifeAction.EXTA_FREE_TURN_OFF_PRESS, **params) and
-                    await self.async_action(ExtaLifeAction.EXTA_FREE_TURN_OFF_RELEASE, **params)):
-                self._assumed_on = False
-                self.async_schedule_update_ha_state()
+            await self.async_actions_optimistic(
+                [ExtaLifeAction.EXTA_FREE_TURN_OFF_PRESS, ExtaLifeAction.EXTA_FREE_TURN_OFF_RELEASE],
+                params=params, assumed_on=False
+            )
 
     @property
     def effect(self) -> str | None:

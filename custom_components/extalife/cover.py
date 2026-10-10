@@ -156,6 +156,8 @@ class ExtaLifeCoverNamed(ExtaLifeChannelNamed, CoverEntity):
         if await self.async_action(ExtaLifeAction.EXTA_LIFE_SET_POS, value=value):
             data["value"] = value
             self.async_schedule_update_ha_state()
+        else:
+            self.raise_command_failed()
 
         return None
 
@@ -227,10 +229,14 @@ class ExtaLifeCoverNamed(ExtaLifeChannelNamed, CoverEntity):
                     _LOGGER.debug("open_cover for cover: %s. pos: %s", self.entity_id, pos)
 
                 self.async_schedule_update_ha_state()
+            else:
+                self.raise_command_failed()
         else:
             if (await self.async_action(ExtaLifeAction.EXTA_FREE_UP_PRESS) and
                     await self.async_action(ExtaLifeAction.EXTA_FREE_UP_RELEASE)):
                 self.async_schedule_update_ha_state()
+            else:
+                self.raise_command_failed()
 
     async def async_close_cover(self, **kwargs: Any) -> None:
         """Close the cover."""
@@ -253,11 +259,15 @@ class ExtaLifeCoverNamed(ExtaLifeChannelNamed, CoverEntity):
                     _LOGGER.debug("close_cover for cover: %s. pos: %s", self.entity_id, pos)
 
                 self.async_schedule_update_ha_state()
+            else:
+                self.raise_command_failed()
 
         else:
             if (await self.async_action(ExtaLifeAction.EXTA_FREE_DOWN_PRESS) and
                     await self.async_action(ExtaLifeAction.EXTA_FREE_DOWN_RELEASE)):
                 self.async_schedule_update_ha_state()
+            else:
+                self.raise_command_failed()
 
     async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stop the cover."""
@@ -266,7 +276,8 @@ class ExtaLifeCoverNamed(ExtaLifeChannelNamed, CoverEntity):
         else:
             action = ExtaLifeAction.EXTA_LIFE_STOP
 
-        await self.async_action( action, value= 1 if self.is_gate else 0 )
+        if not await self.async_action( action, value= 1 if self.is_gate else 0 ):
+            self.raise_command_failed()
 
     def on_state_notification(self, data: dict[str, Any]) -> None:
         """ React on state notification from controller """

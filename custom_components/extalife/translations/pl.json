@@ -498,6 +498,9 @@
     },
     "notification_recording_saved_message": {
       "message": "Zapisano {messages} komunikatów ({size} bajtów) do pliku `{path}`.\n\nLogin i hasło zostały usunięte, ale plik zawiera nazwy urządzeń, numery seryjne i adresy sieciowe kontrolera. Dołączaj go do zgłoszeń tylko, jeśli Ci to nie przeszkadza."
+    },
+    "command_failed": {
+      "message": "Sterownik nie potwierdził polecenia dla {entity}. Urządzenie może być poza zasięgiem lub nie odpowiada."
     }
   },
   "issues": {

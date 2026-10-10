@@ -145,9 +145,10 @@ class ExtaLifeClimateNamed(ExtaLifeChannelNamed, ClimateEntity):
         action = HA_MODE_ACTION.get(hvac_mode)
         if action is None:
             return
-        if await self.async_action(action, value=self.channel_data.get("value")):
-            self.channel_data["work_mode"] = HVAC_MODE_EXTA.get(hvac_mode)
-            self.async_schedule_update_ha_state()
+        await self.async_actions_optimistic(
+            [action], params={"value": self.channel_data.get("value")},
+            data_update={"work_mode": HVAC_MODE_EXTA.get(hvac_mode)}
+        )
 
     @property
     def temperature_unit(self) -> str:
@@ -179,10 +180,10 @@ class ExtaLifeClimateNamed(ExtaLifeChannelNamed, ClimateEntity):
         # controller works with integer values in 0.1 degree
         temp_el = int(round(float(temperature) * 10.0))
 
-        if await self.async_action(ExtaLifeAction.EXTA_LIFE_SET_TMP, value=temp_el):
-            self.channel_data["value"] = temp_el
-            self.channel_data["work_mode"] = HVAC_MODE_EXTA[HVACMode.HEAT]
-            self.async_schedule_update_ha_state()
+        await self.async_actions_optimistic(
+            [ExtaLifeAction.EXTA_LIFE_SET_TMP], params={"value": temp_el},
+            data_update={"value": temp_el, "work_mode": HVAC_MODE_EXTA[HVACMode.HEAT]}
+        )
 
     @property
     def extra_state_attributes(self) -> Mapping[str, Any] | None:

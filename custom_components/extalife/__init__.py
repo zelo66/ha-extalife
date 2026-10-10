@@ -1,6 +1,7 @@
 """Support for ExtaLife devices."""
 import datetime
 import logging
+import time
 from datetime import timedelta
 from typing import (
     Any,
@@ -340,6 +341,8 @@ class ChannelDataManager:
 
         self._channels_known: list[str] = []
         self._unsupported_devices: set[str] = set()
+        # time.monotonic() of the moment the last status snapshot (polling) was requested from the controller
+        self.status_requested_at: float = 0.0
         self._status_polling_task_stop: Callable[[], None] | None = None
         self._version_polling_task_stop: Callable[[], None] | None = None
 
@@ -508,6 +511,8 @@ class ChannelDataManager:
 
         # if connection error or other - will receive None
         # otherwise it contains a list of channels
+        # moment the snapshot was requested - state changes newer than this must not be overwritten
+        requested_at = time.monotonic()
         channels: list[dict[str, Any]] = await self._core.api.async_get_channels()
         if channels is None or len(channels) == 0:
             _LOGGER.warning("[%s] No Channels could be obtained from the controller", self._core.config_entry.title)
@@ -518,6 +523,7 @@ class ChannelDataManager:
         for channel in channels:
             self.channel_update_data(channel["id"], channel["data"])
 
+        self.status_requested_at = requested_at
         self._core.async_signal_send(SIGNAL_DATA_UPDATED)
 
         _LOGGER.debug("[%s] Status for %s channel(s) updated", self._core.config_entry.title, len(self._channels_data))

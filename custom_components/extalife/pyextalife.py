@@ -1722,6 +1722,9 @@ class ExtaLifeConn:
     TCP_BUFF_SIZE = 8192
     # maximum size of a single message from controller (StreamReader default is 64 KiB)
     TCP_READ_LIMIT = 4 * 1024 * 1024
+    # a single unanswered command is usually a device not responding over radio (e.g. sleeping battery device);
+    # only several timeouts in a row mean the connection itself is broken and must be re-established
+    MAX_TIMEOUTS_IN_ROW = 3
 
     def __init__(self, params: ExtaLifeConnParams) -> None:
 
@@ -1755,6 +1758,7 @@ class ExtaLifeConn:
 
         self._response_handlers: list[Callable[[ExtaLifeResponse], None]] = []
         self._pending_requests: set[asyncio.Future] = set()
+        self._timeouts_in_row: int = 0
 
     async def _task_shutdown(
             self, task_name: CloseSource, task: Task, close_source: CloseSource
@@ -1933,9 +1937,12 @@ class ExtaLifeConn:
         if resp_timeout < 0:
             resp_timeout = self.recv_timeout
 
+        queued_at = time.monotonic()
+
         # prevent controller overloading and command loss - wait until finished (lock released)
         async with self._cmd_exec_lock:
 
+            started_at = time.monotonic()
             if self._socket is None:
                 raise ExtaLifeConnError(f"send_request[{self.host}]: host is not connected")
 
@@ -1974,12 +1981,23 @@ class ExtaLifeConn:
                     if remaining <= 0:
                         self._pending_requests.discard(response_reader)
                         response_reader.cancel()
-                        await self._async_close(ExtaLifeConn.CloseSource.REQUEST)
-                        raise ExtaLifeConnError("send_request failed, timeout while waiting for API response")
+                        self._timeouts_in_row += 1
+                        if self._timeouts_in_row >= self.MAX_TIMEOUTS_IN_ROW:
+                            _LOGGER.warning("send_request[%s]: %s commands in a row without response, "
+                                            "reconnecting", self.host, self._timeouts_in_row)
+                            await self._async_close(ExtaLifeConn.CloseSource.REQUEST)
+                        raise ExtaLifeConnError(
+                            f"send_request failed, no response for command {request.command.name} "
+                            f"within {resp_timeout} second(s)"
+                        )
 
                     with suppress(AsyncTimeoutError):
                         await asyncio.wait_for(asyncio.shield(response_reader), remaining)
 
+                self._timeouts_in_row = 0
+                finished_at = time.monotonic()
+                _LOGGER.debug("Cmd=%s: waited %.3f s in queue, executed in %.3f s",
+                              request.command.name, started_at - queued_at, finished_at - started_at)
                 return response_reader.result()
 
             finally:

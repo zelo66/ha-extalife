@@ -498,6 +498,9 @@
     },
     "notification_recording_saved_message": {
       "message": "{messages} messages ({size} bytes) have been saved to `{path}`.\n\nLogin and password are removed, but the file contains device names, serial numbers and network addresses of the controller. Attach it to an issue only if you are fine with that."
+    },
+    "command_failed": {
+      "message": "The controller did not confirm the command for {entity}. The device may be out of range or not responding."
     }
   },
   "issues": {

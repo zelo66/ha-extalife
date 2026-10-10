@@ -1,4 +1,5 @@
 """Constants for the Exta Life integration."""
+from datetime import timedelta
 
 DOMAIN: str = "extalife"
 
@@ -14,6 +15,14 @@ CONF_RECV_TIMEOUT = "recv_timeout" # in seconds
 DEFAULT_POLL_INTERVAL = 5
 DEFAULT_VER_INTERVAL = 12
 DEFAULT_RECV_TIMEOUT = 5
+# default length of a traffic recording started from the button / service without duration
+DEFAULT_RECORDING_MINUTES = 10
+
+# version (firmware) polling: the controller is asked every tick whether the check is due;
+# the interval between checks comes from the options (hours, 0 = disabled)
+VERSION_POLL_TICK = timedelta(minutes=10)
+# first check shortly after (re)connection - just before the first tick
+VERSION_CHECK_FIRST_DELAY = int(VERSION_POLL_TICK.total_seconds()) - 20
 CONF_BACKUP_PATH = "path"
 CONF_BACKUP_SCHEDULE = "schedule"
 CONF_BACKUP_RETENTION = "retention"

@@ -23,6 +23,7 @@ from .const import (
     CONF_BACKUP_PATH,
     CONF_BACKUP_SCHEDULE,
     CONF_BACKUP_RETENTION,
+    DEFAULT_RECORDING_MINUTES,
     DOMAIN,
 )
 from .typing import CoreType
@@ -58,7 +59,9 @@ SCHEMA_RECORD_TRAFFIC = vol.Schema(
     {
         vol.Required(CONF_ENTITY_ID): cv.entity_id,
         # minutes, 0 stops current recording
-        vol.Optional(ATTR_DURATION, default=10): vol.All(vol.Coerce(int), vol.Range(min=0, max=180)),
+        vol.Optional(ATTR_DURATION, default=DEFAULT_RECORDING_MINUTES): vol.All(
+            vol.Coerce(int), vol.Range(min=0, max=180)
+        ),
     }
 )
 

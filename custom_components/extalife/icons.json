@@ -26,6 +26,14 @@
       },
       "controller_response_time": {
         "default": "mdi:timer-outline"
+      },
+      "controller_last_status_update": {
+        "default": "mdi:update"
+      }
+    },
+    "button": {
+      "record_traffic": {
+        "default": "mdi:record-rec"
       }
     }
   },

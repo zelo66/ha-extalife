@@ -52,15 +52,15 @@ Minimum supported Home Assistant version: **2025.1** (tested with 2025.1 and 202
 
 ### Setup
 The integration is set up from Home Assistant GUI (Settings → Devices & services → Add integration). Search for "Exta Life" on the list of possible integrations. If it's not visible - clear your browser cache and refresh page.
-The integration supports Integration Options (poll intervals, switches mapped as lights, inverted cover control, disabling entities of not responding devices) - use **Configure** on the Exta Life integration card.
+The integration supports Integration Options (status poll interval, firmware check interval - 0 disables it, switches mapped as lights, inverted cover control, disabling entities of not responding devices) - use **Configure** on the Exta Life integration card.
 
 ### Features
 * **Events** - every transmitter button is an `event` entity (pressed, released, single / double / triple click,
   long press), scenes activated on the controller are reported by the `Scene` event entity of the controller.
   The same actions are available as device triggers in automations.
-* **Controller diagnostics** - `Connection`, `IP address` and `Response time` entities of the EFC-01 device
-  (response time of the last control command with queue time, average and maximum in attributes), firmware
-  updates of the controller and modules via `update` entities.
+* **Controller diagnostics** - `Connection`, `IP address`, `Response time` (of the last control command, with
+  queue time, average and maximum in attributes) and `Last status update` entities of the EFC-01 device, a
+  `Record traffic` button, firmware updates of the controller and modules via `update` entities.
 * **Device diagnostics** - every channel has a `… responding` binary sensor based on the controller's radio timeout
   flag; it stays available when the device is out of reach, so history shows outages and automations can react.
   **Download diagnostics** on a device page gives its raw channel data as reported by the controller - attach it
@@ -70,8 +70,9 @@ The integration supports Integration Options (poll intervals, switches mapped as
 * **Services** - `extalife.refresh_state`, `extalife.restart`, `extalife.config_backup` and
   `extalife.record_traffic` (all but the first one for administrators only).
 * **Diagnostics** - downloadable diagnostics with controller configuration; login and password are removed.
-* **Traffic recording** - `extalife.record_traffic` records all messages exchanged with the controller for given
-  number of minutes to `config/extalife/recordings/` (login and password removed). Such recordings are replayed by
+* **Traffic recording** - the `Record traffic` button of the controller (10 minutes, press again to stop) or
+  `extalife.record_traffic` with any duration records all messages exchanged with the controller to
+  `config/extalife/recordings/` (login and password removed). Such recordings are replayed by
   the tests, so attaching one to an issue is the best way to get a problem fixed or a new device supported -
   see [tests/recordings](tests/recordings/README.md).
 

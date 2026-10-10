@@ -45,6 +45,7 @@ from homeassistant.helpers.typing import (
 
 from .helpers.const import (
     CONTROLLER_DATA,
+    SIGNAL_DATA_UPDATED,
     SIGNAL_COMMAND_STATS_UPDATED,
     SIGNAL_CONTROLLER_STATE_UPDATED,
     DOMAIN_VIRTUAL_SENSORS,
@@ -310,6 +311,7 @@ async def async_setup_entry(
                 if channel_data.get(CONTROLLER_DATA):
                     entities.append(ExtaLifeControllerIpAddress(config_entry, channel_data))
                     entities.append(ExtaLifeControllerResponseTime(config_entry, channel_data))
+                    entities.append(ExtaLifeControllerLastStatusUpdate(config_entry, channel_data))
                 else:
                     entities.append(ExtaLifeSensor(channel_data, config_entry))
             async_add_entities(entities)
@@ -680,3 +682,33 @@ class ExtaLifeControllerResponseTime(ExtaLifeDevice, SensorEntity):
             "all_commands_failed": all_commands.failed,
         })
         return es_attr
+
+
+class ExtaLifeControllerLastStatusUpdate(ExtaLifeDevice, SensorEntity):
+    """When the status of all devices was last obtained from the controller.
+
+    Lets you notice that status polling stopped working even though the connection is alive."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.TIMESTAMP
+
+    def __init__(self, config_entry: ConfigEntry, device_data: dict[str, Any]) -> None:
+        super().__init__(config_entry, device_data)
+        self._attr_translation_key = "controller_last_status_update"
+
+    def _get_unique_id(self) -> str:
+        return f"{super()._get_unique_id()}-last_status_update"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            self.core.async_signal_register(SIGNAL_DATA_UPDATED, self.async_write_ha_state)
+        )
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self) -> datetime | None:
+        return self.channel_manager.status_updated_at

@@ -79,6 +79,10 @@
           "poll_interval": "Czas pomiędzy odpytaniem EFC o stan urządzeń (minuty)",
           "version_interval": "Czas pomiędzy sprawdzeniem dostępności nowego oprogramowania (godziny)",
           "disable_not_responding": "Zmień kolor encji na szary, gdy urządzenie nie odpowiada\n(tak jak w aplikacji Exta Life)"
+        },
+        "data_description": {
+          "poll_interval": "Jak często stan wszystkich urządzeń jest odczytywany z kontrolera. Zmiany stanu są i tak odbierane natychmiast.",
+          "version_interval": "Jak często kontroler jest pytany o nowe wersje oprogramowania (obejmuje sprawdzenie w internecie). 0 wyłącza sprawdzanie."
         }
       },
       "light": {
@@ -237,6 +241,9 @@
       },
       "update": {
         "name": "Sprawdź aktualizacje"
+      },
+      "record_traffic": {
+        "name": "Nagraj komunikację ({minutes} min)"
       }
     },
     "climate": {
@@ -354,6 +361,9 @@
             "name": "Nieudane wszystkie polecenia"
           }
         }
+      },
+      "controller_last_status_update": {
+        "name": "Ostatnia aktualizacja stanu"
       }
     },
     "switch": {

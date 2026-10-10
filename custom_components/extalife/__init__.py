@@ -30,6 +30,7 @@ from homeassistant.helpers import (
     issue_registry as ir,
 )
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.util import dt as dt_util
 from homeassistant.loader import (
     Integration,
     async_get_integration,
@@ -59,6 +60,8 @@ from .helpers.const import (
     OPTIONS_GENERAL_VER_INTERVAL,
     CONTROLLER_DATA,
     RESPONDING_DATA,
+    VERSION_CHECK_FIRST_DELAY,
+    VERSION_POLL_TICK,
     ISSUE_UNSUPPORTED_DEVICES,
     URL_ISSUE_TRACKER,
 )
@@ -344,6 +347,8 @@ class ChannelDataManager:
         self._unsupported_devices: set[str] = set()
         # time.monotonic() of the last local state change (command / notification) per channel
         self._channel_changed_at: dict[str, float] = {}
+        # when the status of all devices was last obtained from the controller
+        self.status_updated_at: datetime.datetime | None = None
         self._status_polling_task_stop: Callable[[], None] | None = None
         self._version_polling_task_stop: Callable[[], None] | None = None
 
@@ -527,6 +532,8 @@ class ChannelDataManager:
             _LOGGER.warning("[%s] No Channels could be obtained from the controller", self._core.config_entry.title)
             return
 
+        self.status_updated_at = dt_util.utcnow()
+
         # create indexed access: dict from list element
         # dict key = "data" section
         for channel in channels:
@@ -702,18 +709,28 @@ class ChannelDataManager:
             self._version_polling_task_remove(False)
             self._version_polling_task_configure(False)
 
+    @property
+    def version_check_interval(self) -> int:
+        """Interval between firmware version checks in hours from the options, 0 = disabled"""
+        return int(self._config_entry.options.get(OPTIONS_GENERAL, {}).get(
+            OPTIONS_GENERAL_VER_INTERVAL, DEFAULT_VER_INTERVAL
+        ))
+
     def _version_polling_task_configure(self, set_next_check: bool = True) -> None:
         """(Re)set periodic callback for version polling"""
 
-        version_poll_interval: int = 10
+        if self.version_check_interval == 0:
+            _LOGGER.debug("[%s] firmware version check is disabled", self._core.config_entry.title)
+            self._core.ver_check_set(-1)
+            return
 
-        _LOGGER.debug("[%s] Periodic version poll task interval has been set to %s minutes(s)",
-                      self._core.config_entry.title, version_poll_interval)
+        _LOGGER.debug("[%s] periodic version poll tick set to %s, check interval %s hour(s)",
+                      self._core.config_entry.title, VERSION_POLL_TICK, self.version_check_interval)
         self._version_polling_task_stop = self._core.async_track_time_interval(
-            self._async_version_polling_task, timedelta(minutes=version_poll_interval)
+            self._async_version_polling_task, VERSION_POLL_TICK
         )
         if set_next_check:
-            self._core.ver_check_set(580)
+            self._core.ver_check_set(VERSION_CHECK_FIRST_DELAY)
 
     def _version_polling_task_remove(self, unset_next_check: bool = True) -> None:
         """Stop version polling task scheduler"""
@@ -747,10 +764,12 @@ class ChannelDataManager:
                     config_data.update({"command": ExtaLifeCmd.FETCH_RECEIVER_CONFIG_DETAILS})
                     self.device_on_notify(config_data)
         finally:
-            version_poll_interval: int = self._config_entry.options.get(OPTIONS_GENERAL, {}).get(
-                OPTIONS_GENERAL_VER_INTERVAL, DEFAULT_VER_INTERVAL
-            )
-            next_check: int = version_poll_interval * 3600 if now is not None else 0
+            if self.version_check_interval == 0:
+                next_check = -1  # disabled
+            elif now is not None:
+                next_check = self.version_check_interval * 3600
+            else:
+                next_check = 0  # manual run - keep the schedule
             self._core.ver_check_set(next_check, True)
 
         return None

@@ -79,6 +79,10 @@
           "poll_interval": "Status polling interval",
           "version_interval": "New version polling check interval",
           "disable_not_responding": "Disable entities when device is not responding.\n(just as in the 'Exta Life' app)"
+        },
+        "data_description": {
+          "poll_interval": "How often the status of all devices is read from the controller. State changes are received immediately anyway.",
+          "version_interval": "How often the controller is asked for new firmware versions (this includes a check on the internet). 0 disables the check."
         }
       },
       "light": {
@@ -203,6 +207,9 @@
       },
       "update": {
         "name": "Check updates"
+      },
+      "record_traffic": {
+        "name": "Record traffic ({minutes} min)"
       }
     },
     "binary_sensor": {
@@ -354,6 +361,9 @@
             "name": "All commands failed"
           }
         }
+      },
+      "controller_last_status_update": {
+        "name": "Last status update"
       }
     },
     "switch": {

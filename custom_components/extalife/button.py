@@ -1,5 +1,6 @@
 """Support for Exta Life devices firmware update notifications """
 import logging
+from datetime import timedelta
 from typing import (
     Any,
 )
@@ -16,6 +17,7 @@ from homeassistant.helpers.entity import (
 )
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from .helpers.const import DEFAULT_RECORDING_MINUTES
 from .helpers.core import Core
 from .helpers.entities import (
     ExtaLifeDevice
@@ -41,6 +43,7 @@ async def async_setup_entry(
             for device_data in devices:
                 entities.append(ExtaLifeButton(ButtonDeviceClass.UPDATE, config_entry, device_data))
                 entities.append(ExtaLifeButton(ButtonDeviceClass.RESTART, config_entry, device_data))
+                entities.append(ExtaLifeRecordTrafficButton(config_entry, device_data))
 
             if entities:
                 async_add_entities(entities)
@@ -76,3 +79,23 @@ class ExtaLifeButton(ExtaLifeDevice, ButtonEntity):
 
         elif self._attr_device_class == ButtonDeviceClass.UPDATE:
             await self._core.channel_manager.async_version_polling_task_run()
+
+
+class ExtaLifeRecordTrafficButton(ExtaLifeDevice, ButtonEntity):
+    """Start a traffic recording with default length; pressed while recording - stop and save it"""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, config_entry: ConfigEntry, device_data: dict[str, Any]) -> None:
+        super().__init__(config_entry, device_data)
+        self._attr_translation_key = "record_traffic"
+        self._attr_translation_placeholders = {"minutes": str(DEFAULT_RECORDING_MINUTES)}
+
+    def _get_unique_id(self) -> str:
+        return f"{super()._get_unique_id()}-record_traffic"
+
+    async def async_press(self) -> None:
+        if self._core.is_recording:
+            await self._core.async_stop_recording()
+        else:
+            await self._core.async_start_recording(timedelta(minutes=DEFAULT_RECORDING_MINUTES))

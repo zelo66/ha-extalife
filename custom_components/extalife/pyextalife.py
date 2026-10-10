@@ -1791,6 +1791,14 @@ class ExtaLifeConn:
     # a single unanswered command is usually a device not responding over radio (e.g. sleeping battery device);
     # only several timeouts in a row mean the connection itself is broken and must be re-established
     MAX_TIMEOUTS_IN_ROW = 3
+    # fetching device lists makes the controller query its devices and it may answer after 5+ s
+    # (measured ~4.8 s for FETCH_RECEIVERS with 12 receivers) - give these commands more time
+    SLOW_COMMANDS_TIMEOUT = 20.0
+    SLOW_COMMANDS = frozenset({
+        ExtaLifeCmd.FETCH_RECEIVERS,
+        ExtaLifeCmd.FETCH_SENSORS,
+        ExtaLifeCmd.FETCH_TRANSMITTERS,
+    })
 
     def __init__(self, params: ExtaLifeConnParams) -> None:
 
@@ -2007,6 +2015,8 @@ class ExtaLifeConn:
 
         if resp_timeout < 0:
             resp_timeout = self.recv_timeout
+            if request.command in self.SLOW_COMMANDS:
+                resp_timeout = max(resp_timeout, self.SLOW_COMMANDS_TIMEOUT)
 
         queued_at = time.monotonic()
 

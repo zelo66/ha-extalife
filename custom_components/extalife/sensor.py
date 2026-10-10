@@ -33,6 +33,7 @@ from homeassistant.const import (
     UnitOfReactivePower,
     UnitOfApparentPower,
     UnitOfEnergy,
+    UnitOfTime,
     LIGHT_LUX,
 )
 from homeassistant.const import EntityCategory
@@ -44,6 +45,7 @@ from homeassistant.helpers.typing import (
 
 from .helpers.const import (
     CONTROLLER_DATA,
+    SIGNAL_COMMAND_STATS_UPDATED,
     SIGNAL_CONTROLLER_STATE_UPDATED,
     DOMAIN_VIRTUAL_SENSORS,
     DOMAIN_VIRTUAL_SENSOR,
@@ -303,11 +305,14 @@ async def async_setup_entry(
         channels: list[dict[str, Any]] = core.get_channels(DOMAIN_SENSOR)
         _LOGGER.debug("Discovery (%s): %s", DOMAIN_SENSOR, channels)
         if channels:
-            async_add_entities([
-                ExtaLifeControllerIpAddress(config_entry, channel_data) if channel_data.get(CONTROLLER_DATA)
-                else ExtaLifeSensor(channel_data, config_entry)
-                for channel_data in channels
-            ])
+            entities: list[SensorEntity] = []
+            for channel_data in channels:
+                if channel_data.get(CONTROLLER_DATA):
+                    entities.append(ExtaLifeControllerIpAddress(config_entry, channel_data))
+                    entities.append(ExtaLifeControllerResponseTime(config_entry, channel_data))
+                else:
+                    entities.append(ExtaLifeSensor(channel_data, config_entry))
+            async_add_entities(entities)
 
         core.pop_channels(DOMAIN_SENSOR)
 
@@ -623,3 +628,55 @@ class ExtaLifeControllerIpAddress(ExtaLifeDevice, SensorEntity):
     @property
     def native_value(self) -> str | None:
         return self.controller.network.get("ip_address") or self.controller.host or None
+
+
+class ExtaLifeControllerResponseTime(ExtaLifeDevice, SensorEntity):
+    """Time the controller needed to confirm the last device control command (radio round trip)"""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.DURATION
+    _attr_native_unit_of_measurement = UnitOfTime.SECONDS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, config_entry: ConfigEntry, device_data: dict[str, Any]) -> None:
+        super().__init__(config_entry, device_data)
+        self._attr_translation_key = "controller_response_time"
+
+    def _get_unique_id(self) -> str:
+        return f"{super()._get_unique_id()}-response_time"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(
+            self.core.async_signal_register(SIGNAL_COMMAND_STATS_UPDATED, self.async_write_ha_state)
+        )
+
+    @property
+    def available(self) -> bool:
+        return True
+
+    @property
+    def native_value(self) -> float | None:
+        stats = self.controller.control_stats
+        if stats.last_executed is None or stats.last_failed:
+            return None
+        return stats.last_executed
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any] | None:
+        es_attr = self._mapping_to_dict(super().extra_state_attributes)
+        control = self.controller.control_stats
+        all_commands = self.controller.command_stats
+        es_attr.update({
+            "last_queued_seconds": control.last_queued,
+            "last_failed": control.last_failed,
+            "average_seconds": control.average_executed,
+            "max_seconds": control.max_executed,
+            "commands": control.count,
+            "failed_commands": control.failed,
+            "all_commands": all_commands.count,
+            "all_commands_average_seconds": all_commands.average_executed,
+            "all_commands_failed": all_commands.failed,
+        })
+        return es_attr

@@ -58,6 +58,7 @@ from .helpers.const import (
     OPTIONS_GENERAL_POLL_INTERVAL,
     OPTIONS_GENERAL_VER_INTERVAL,
     CONTROLLER_DATA,
+    RESPONDING_DATA,
     ISSUE_UNSUPPORTED_DEVICES,
     URL_ISSUE_TRACKER,
 )
@@ -341,8 +342,8 @@ class ChannelDataManager:
 
         self._channels_known: list[str] = []
         self._unsupported_devices: set[str] = set()
-        # time.monotonic() of the moment the last status snapshot (polling) was requested from the controller
-        self.status_requested_at: float = 0.0
+        # time.monotonic() of the last local state change (command / notification) per channel
+        self._channel_changed_at: dict[str, float] = {}
         self._status_polling_task_stop: Callable[[], None] | None = None
         self._version_polling_task_stop: Callable[[], None] | None = None
 
@@ -385,6 +386,14 @@ class ChannelDataManager:
             self._channels_known.append(channel_id)
             return False
         return True
+
+    def channel_mark_changed(self, channel_id: str) -> None:
+        """Remember that the channel state has just been changed by a command or a notification"""
+        self._channel_changed_at[channel_id] = time.monotonic()
+
+    def channels_get(self) -> dict[str, dict[str, Any]]:
+        """All known channels: {channel_id: channel_data}"""
+        return self._channels_data
 
     def channel_get_data(self, channel_id: str) -> dict[str, Any] | None:
         """get data associated with requested channel_id"""
@@ -521,9 +530,14 @@ class ChannelDataManager:
         # create indexed access: dict from list element
         # dict key = "data" section
         for channel in channels:
+            if self._channel_changed_at.get(channel["id"], 0.0) > requested_at:
+                # channel state changed (command or notification) after the snapshot was requested, so the
+                # snapshot is outdated for this channel - keep the newer state
+                _LOGGER.debug("[%s] skipping outdated status of channel %s",
+                              self._core.config_entry.title, channel["id"])
+                continue
             self.channel_update_data(channel["id"], channel["data"])
 
-        self.status_requested_at = requested_at
         self._core.async_signal_send(SIGNAL_DATA_UPDATED)
 
         _LOGGER.debug("[%s] Status for %s channel(s) updated", self._core.config_entry.title, len(self._channels_data))
@@ -628,6 +642,10 @@ class ChannelDataManager:
 
             std_platforms_channels.setdefault(platform_name, []).append(channel)
             entities += 1
+
+            # diagnostic 'responding' sensor for devices reporting radio timeouts
+            if "is_timeout" in channel_data:
+                std_platforms_channels.setdefault(DOMAIN_BINARY_SENSOR, []).append({**channel, RESPONDING_DATA: True})
 
         _LOGGER.debug("Discovery found %s entities and %s device(s)", entities, devices)
 

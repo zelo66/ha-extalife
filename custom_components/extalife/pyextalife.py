@@ -663,6 +663,54 @@ DEVICE_ICON_ARR_LIGHT = [
 ]
 
 
+class ExtaLifeCommandStats:
+    """Timing of commands sent to the controller - for diagnostics of slow responses"""
+
+    HISTORY = 50
+
+    def __init__(self) -> None:
+        self.count: int = 0
+        self.failed: int = 0
+        self.last_queued: float | None = None     # seconds waited for other commands to finish
+        self.last_executed: float | None = None   # seconds from sending until the final response
+        self.last_command: str | None = None
+        self.last_failed: bool = False
+        self._history: list[float] = []
+
+    def record(self, command: str, queued: float, executed: float, failed: bool) -> None:
+        self.count += 1
+        self.failed += int(failed)
+        self.last_command = command
+        self.last_queued = round(queued, 3)
+        self.last_executed = round(executed, 3)
+        self.last_failed = failed
+        if not failed:
+            self._history.append(executed)
+            del self._history[:-self.HISTORY]
+
+    @property
+    def average_executed(self) -> float | None:
+        if not self._history:
+            return None
+        return round(sum(self._history) / len(self._history), 3)
+
+    @property
+    def max_executed(self) -> float | None:
+        return round(max(self._history), 3) if self._history else None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "commands": self.count,
+            "failed": self.failed,
+            "last_command": self.last_command,
+            "last_queued_seconds": self.last_queued,
+            "last_executed_seconds": self.last_executed,
+            "last_failed": self.last_failed,
+            "average_executed_seconds": self.average_executed,
+            "max_executed_seconds": self.max_executed,
+        }
+
+
 class ExtaLifeMessage:
     def __init__(self, command: ExtaLifeCmd = ExtaLifeCmd.NOOP):
         self._command: ExtaLifeCmd = command
@@ -875,10 +923,25 @@ class ExtaLifeAPI:
         self._reconnect_task: Task | None = None
         # optional observer of all messages exchanged with the controller: callback(direction, message)
         self.traffic_callback: Callable[[str, str], None] | None = None
+        # timing of CONTROL_DEVICE commands (user actions) and of all commands
+        self.control_stats = ExtaLifeCommandStats()
+        self.command_stats = ExtaLifeCommandStats()
+        # called after every command with the stats updated
+        self.stats_callback: Callable[[], None] | None = None
 
     def _traffic_dispatch(self, direction: str, message: str) -> None:
         if self.traffic_callback is not None:
             self.traffic_callback(direction, message)
+
+    def _stats_dispatch(self, command: ExtaLifeCmd, queued: float, executed: float, failed: bool) -> None:
+        self.command_stats.record(command.name, queued, executed, failed)
+        if command == ExtaLifeCmd.CONTROL_DEVICE:
+            self.control_stats.record(command.name, queued, executed, failed)
+        if self.stats_callback is not None:
+            try:
+                self.stats_callback()
+            except Exception:  # pylint: disable=broad-except
+                _LOGGER.exception("Stats callback failed")
 
     @staticmethod
     def _config_backup_rotate(backup_path: str, backup_prefix: str, backup_retention: int) -> None:
@@ -1233,6 +1296,7 @@ class ExtaLifeAPI:
             conn_params: ExtaLifeConnParams = ExtaLifeConnParams(_host, _port, recv_timeout, self._loop)
             conn_params.on_event_callback = self._async_do_conn_event_callback
             conn_params.traffic_callback = self._traffic_dispatch
+            conn_params.stats_callback = self._stats_dispatch
 
             tcp_conn = ExtaLifeConn(conn_params)
             try:
@@ -1688,6 +1752,8 @@ class ExtaLifeConnParams:
         self.on_event_callback: Callable[[ExtaLifeConnType, ExtaLifeEvent, Any], Awaitable] | None = None
         # called with direction ("in" / "out") and raw message for every message exchanged with controller
         self.traffic_callback: Callable[[str, str], None] | None = None
+        # called with (command, queued seconds, executed seconds, failed) after every command
+        self.stats_callback: Callable[[ExtaLifeCmd, float, float, bool], None] | None = None
 
     @property
     def host(self) -> str:
@@ -1743,6 +1809,7 @@ class ExtaLifeConn:
                                      [ExtaLifeConnType, ExtaLifeEvent, Any], Awaitable
                                  ] | None = params.on_event_callback
         self._traffic_callback: Callable[[str, str], None] | None = params.traffic_callback
+        self._stats_callback: Callable[[ExtaLifeCmd, float, float, bool], None] | None = params.stats_callback
 
         self._username: str = ""
         self._password: str = ""
@@ -1920,6 +1987,10 @@ class ExtaLifeConn:
 
         await self._async_post_data(request_data)
 
+    def _stats(self, command: ExtaLifeCmd, queued: float, executed: float, failed: bool) -> None:
+        if self._stats_callback is not None:
+            self._stats_callback(command, queued, executed, failed)
+
     def _traffic(self, direction: str, message: str) -> None:
         """Pass exchanged message to traffic callback (e.g. traffic recorder)"""
         if self._traffic_callback is None:
@@ -1981,6 +2052,7 @@ class ExtaLifeConn:
                     if remaining <= 0:
                         self._pending_requests.discard(response_reader)
                         response_reader.cancel()
+                        self._stats(request.command, started_at - queued_at, time.monotonic() - started_at, True)
                         self._timeouts_in_row += 1
                         if self._timeouts_in_row >= self.MAX_TIMEOUTS_IN_ROW:
                             _LOGGER.warning("send_request[%s]: %s commands in a row without response, "
@@ -1998,6 +2070,7 @@ class ExtaLifeConn:
                 finished_at = time.monotonic()
                 _LOGGER.debug("Cmd=%s: waited %.3f s in queue, executed in %.3f s",
                               request.command.name, started_at - queued_at, finished_at - started_at)
+                self._stats(request.command, started_at - queued_at, finished_at - started_at, False)
                 return response_reader.result()
 
             finally:

@@ -41,6 +41,7 @@ SIGNAL_DATA_UPDATED = f"{DOMAIN}_data_updated"
 SIGNAL_CHANNEL_NOTIF_STATE_UPDATED = f"{DOMAIN}_channel_notif_state_updated"
 SIGNAL_DEVICE_NOTIF_CONFIG_UPDATED = f"{DOMAIN}_device_notif_config_updated"
 SIGNAL_CONTROLLER_STATE_UPDATED = f"{DOMAIN}_controller_state_updated"
+SIGNAL_COMMAND_STATS_UPDATED = f"{DOMAIN}_command_stats_updated"
 
 # repairs issues
 ISSUE_CONTROLLER_OFFLINE = "controller_offline"
@@ -50,6 +51,8 @@ URL_ISSUE_TRACKER = "https://github.com/gadulowaty/ha-extalife/issues"
 
 # key marking controller (device level) data passed to platforms instead of channel data
 CONTROLLER_DATA = "_controller"
+# key marking channel data for which a 'responding' diagnostic binary sensor should be created
+RESPONDING_DATA = "_responding"
 
 
 # transmitters

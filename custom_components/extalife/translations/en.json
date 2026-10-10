@@ -234,6 +234,9 @@
       },
       "controller_connection": {
         "name": "Connection"
+      },
+      "channel_responding": {
+        "name": "Responding"
       }
     },
     "climate": {
@@ -319,6 +322,38 @@
       },
       "controller_ip": {
         "name": "IP address"
+      },
+      "controller_response_time": {
+        "name": "Response time",
+        "state_attributes": {
+          "last_queued_seconds": {
+            "name": "Last command waited in queue (s)"
+          },
+          "last_failed": {
+            "name": "Last command failed"
+          },
+          "average_seconds": {
+            "name": "Average (s)"
+          },
+          "max_seconds": {
+            "name": "Maximum (s)"
+          },
+          "commands": {
+            "name": "Control commands"
+          },
+          "failed_commands": {
+            "name": "Failed control commands"
+          },
+          "all_commands": {
+            "name": "All commands"
+          },
+          "all_commands_average_seconds": {
+            "name": "All commands average (s)"
+          },
+          "all_commands_failed": {
+            "name": "All commands failed"
+          }
+        }
       }
     },
     "switch": {

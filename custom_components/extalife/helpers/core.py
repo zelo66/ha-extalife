@@ -36,6 +36,7 @@ from .const import (
     CONTROLLER_OFFLINE_ISSUE_DELAY,
     ISSUE_CONTROLLER_OFFLINE,
     SIGNAL_CONTROLLER_STATE_UPDATED,
+    SIGNAL_COMMAND_STATS_UPDATED,
     URL_CHANGELOG_JSON,
 )
 from .recorder import TrafficRecorder
@@ -112,6 +113,8 @@ class Core:
             on_disconnect_callback=self._on_api_disconnect_callback,
             on_notification_callback=self._on_api_notification_callback
         )
+
+        self._api.stats_callback = lambda: self.async_signal_send(SIGNAL_COMMAND_STATS_UPDATED)
 
         self._signal_callbacks: dict[str, Callable[[], None]] = {}
         self._track_time_callbacks: list[Callable] = []

@@ -33,7 +33,8 @@ ZAMEL Exta Life integration with Home Assistant based on custom component.
 
 Not supported yet: GKN-01, ROP-27, LEDIX P260, Bulik DRS-985 and other devices unknown to the integration.
 When the controller reports such devices, the integration shows an issue in **Settings → Repairs**. If you want
-a device to be supported, open an issue and attach a traffic recording made while using the device (see below).
+a device to be supported, open an issue and attach the device diagnostics (device page → Download diagnostics)
+or a traffic recording made while using the device (see below).
 
 **Note:** Certain switches are mapped into Home Assistant light entities depending on icon assigned to them. This is to support voice control by Google Assistant and others and because switches are mostly used for light control.
 ### Installation
@@ -57,8 +58,13 @@ The integration supports Integration Options (poll intervals, switches mapped as
 * **Events** - every transmitter button is an `event` entity (pressed, released, single / double / triple click,
   long press), scenes activated on the controller are reported by the `Scene` event entity of the controller.
   The same actions are available as device triggers in automations.
-* **Controller diagnostics** - `Connection` and `IP address` entities of the EFC-01 device, firmware updates of the
-  controller and modules via `update` entities.
+* **Controller diagnostics** - `Connection`, `IP address` and `Response time` entities of the EFC-01 device
+  (response time of the last control command with queue time, average and maximum in attributes), firmware
+  updates of the controller and modules via `update` entities.
+* **Device diagnostics** - every channel has a `… responding` binary sensor based on the controller's radio timeout
+  flag; it stays available when the device is out of reach, so history shows outages and automations can react.
+  **Download diagnostics** on a device page gives its raw channel data as reported by the controller - attach it
+  to an issue when asking for support of a new device model.
 * **Repairs** - an issue is raised when the controller is offline for more than 15 minutes and when the controller
   reports unsupported devices.
 * **Services** - `extalife.refresh_state`, `extalife.restart`, `extalife.config_backup` and
@@ -84,7 +90,8 @@ Commands go over radio from the EFC-01 controller to the device, so some delay i
 If commands are still slow:
 1. Check **Max waiting time for a response** in the integration settings (Reconfigure). With a REP-21 repeater
    in the installation it should be 10-15 seconds.
-2. Enable debug logging for `custom_components.extalife` - every command is logged as
+2. Look at the `Response time` sensor of the controller (its history shows how the radio behaves over the day)
+   and at the `… responding` sensors of the devices. In debug logging every command is logged as
    `Cmd=CONTROL_DEVICE: waited X s in queue, executed in Y s`. A long *executed* time means slow radio
    communication with the device, a long *waited* time means the controller was busy with other commands.
 3. Make a traffic recording (`extalife.record_traffic`) while reproducing the problem and attach it to an issue.

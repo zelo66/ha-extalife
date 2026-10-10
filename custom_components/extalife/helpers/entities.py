@@ -1,7 +1,6 @@
 """Support for ExtaLife devices."""
 import datetime
 import logging
-import time
 from typing import (
     Any,
 )
@@ -246,8 +245,6 @@ class ExtaLifeChannel(ExtaLifeEntity):
         super().__init__(config_entry, channel.get("data"))
 
         self._channel_id: str = channel.get("id")
-        # time.monotonic() of the last state change made by a command or a notification
-        self._state_changed_at: float = 0.0
 
     @staticmethod
     def _format_state_attr(attr: dict[str, Any]) -> dict[str, Any]:
@@ -290,12 +287,6 @@ class ExtaLifeChannel(ExtaLifeEntity):
         # read "data" section/dict by channel id
         data = self.channel_manager.channel_get_data(self.channel_id)
 
-        if data is not None and self._state_changed_at > self.channel_manager.status_requested_at:
-            # status snapshot was requested from the controller before the last state change (command or
-            # notification) of this entity, so it is outdated - keep current state and correct stored data
-            self.channel_manager.channel_update_data(self.channel_id, self.channel_data)
-            return
-
         self._set_data(data)
 
     async def async_will_remove_from_hass(self) -> None:
@@ -313,7 +304,7 @@ class ExtaLifeChannel(ExtaLifeEntity):
         then must update its state. For consistency reasons - Channel Data Manager is updated and then
         HA status update is scheduled"""
 
-        self._state_changed_at = time.monotonic()
+        self.channel_manager.channel_mark_changed(self.channel_id)
         self.channel_manager.channel_update_data(self.channel_id, self.channel_data)
         self.async_schedule_update_ha_state(True)
 
@@ -463,7 +454,7 @@ class ExtaLifeChannelNamed(ExtaLifeChannel):
 
     def _apply_local_state(self) -> None:
         """Publish state changed locally (not reported by the controller yet)"""
-        self._state_changed_at = time.monotonic()
+        self.channel_manager.channel_mark_changed(self.channel_id)
         self.channel_manager.channel_update_data(self.channel_id, self.channel_data)
         self.async_write_ha_state()
 

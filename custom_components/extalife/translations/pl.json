@@ -226,6 +226,9 @@
       },
       "controller_connection": {
         "name": "Połączenie"
+      },
+      "channel_responding": {
+        "name": "Odpowiada"
       }
     },
     "button": {
@@ -319,6 +322,38 @@
       },
       "controller_ip": {
         "name": "Adres IP"
+      },
+      "controller_response_time": {
+        "name": "Czas odpowiedzi",
+        "state_attributes": {
+          "last_queued_seconds": {
+            "name": "Ostatnie polecenie czekało w kolejce (s)"
+          },
+          "last_failed": {
+            "name": "Ostatnie polecenie nieudane"
+          },
+          "average_seconds": {
+            "name": "Średnia (s)"
+          },
+          "max_seconds": {
+            "name": "Maksimum (s)"
+          },
+          "commands": {
+            "name": "Polecenia sterowania"
+          },
+          "failed_commands": {
+            "name": "Nieudane polecenia sterowania"
+          },
+          "all_commands": {
+            "name": "Wszystkie polecenia"
+          },
+          "all_commands_average_seconds": {
+            "name": "Średnia wszystkich poleceń (s)"
+          },
+          "all_commands_failed": {
+            "name": "Nieudane wszystkie polecenia"
+          }
+        }
       }
     },
     "switch": {

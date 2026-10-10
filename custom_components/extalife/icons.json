@@ -23,6 +23,9 @@
     "sensor": {
       "controller_ip": {
         "default": "mdi:ip-network"
+      },
+      "controller_response_time": {
+        "default": "mdi:timer-outline"
       }
     }
   },

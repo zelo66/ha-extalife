@@ -18,6 +18,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .helpers.const import (
     CONTROLLER_DATA,
     DOMAIN_VIRTUAL_BINARY_SENSOR_SENSOR,
+    RESPONDING_DATA,
     SIGNAL_CONTROLLER_STATE_UPDATED,
 )
 from .helpers.core import Core
@@ -45,11 +46,15 @@ async def async_setup_entry(
         channels: list[dict[str, Any]] = core.get_channels(DOMAIN_BINARY_SENSOR)
         _LOGGER.debug("Discovery: (%s): %s", DOMAIN_BINARY_SENSOR, channels)
         if channels:
-            async_add_entities([
-                ExtaLifeControllerConnectivity(config_entry, channel) if channel.get(CONTROLLER_DATA)
-                else ExtaLifeBinarySensorNamed(channel, config_entry)
-                for channel in channels
-            ])
+            entities: list[BinarySensorEntity] = []
+            for channel in channels:
+                if channel.get(CONTROLLER_DATA):
+                    entities.append(ExtaLifeControllerConnectivity(config_entry, channel))
+                elif channel.get(RESPONDING_DATA):
+                    entities.append(ExtaLifeChannelResponding(channel, config_entry))
+                else:
+                    entities.append(ExtaLifeBinarySensorNamed(channel, config_entry))
+            async_add_entities(entities)
 
         core.pop_channels(DOMAIN_BINARY_SENSOR)
         return None
@@ -165,3 +170,41 @@ class ExtaLifeControllerConnectivity(ExtaLifeDevice, BinarySensorEntity):
     @property
     def is_on(self) -> bool:
         return self.controller.is_connected
+
+
+class ExtaLifeChannelResponding(ExtaLifeChannelNamed, BinarySensorEntity):
+    """Diagnostic sensor: the device responds to the controller over radio (controller 'is_timeout' flag).
+
+    Unlike the main entity of the channel it stays available when the device is not responding, so the
+    history shows when the device was out of reach and automations can react to it."""
+
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    def __init__(self, channel: dict[str, Any], config_entry: ConfigEntry) -> None:
+        super().__init__(config_entry, channel)
+        self._attr_translation_key = "channel_responding"
+
+    def _get_unique_id(self) -> str:
+        return f"{super()._get_unique_id()}-responding"
+
+    @property
+    def name(self) -> str | None:
+        # device may have several channels - name the sensor after the channel alias
+        alias = self.channel_data.get("alias")
+        return f"{alias} responding" if alias else "Responding"
+
+    @property
+    def available(self) -> bool:
+        return self.data_available
+
+    @property
+    def is_on(self) -> bool | None:
+        is_timeout = self.channel_data.get("is_timeout")
+        if is_timeout is None:
+            return None
+        return not is_timeout
+
+    @property
+    def extra_state_attributes(self) -> Mapping[str, Any] | None:
+        return {"channel_id": self.channel_id}
